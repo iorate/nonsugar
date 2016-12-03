@@ -26,3 +26,5 @@ $(PROGRAM): $(OBJS)
 
 clean:
 	rm -rf $(PROGRAM) $(OBJS)
+
+$(OBJS): ../include/nonsugar.hpp

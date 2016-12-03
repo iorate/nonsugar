@@ -20,18 +20,18 @@ int main(int argc, char **argv)
     enum class ConnectOption { Help, Host, Port };
 
     auto const greetCmd = command<GreetOption>("subcmd greet", "Greeting command")
-        .flag<GreetOption::Help>("?", "help", "display this help and exit")
-        .flag<GreetOption::Message, std::string>("g", "greet", "STRING", "greeting message", "Hello")
-        .flag<GreetOption::Decorate>("", "decolate", "decolate message")
+        .flag<GreetOption::Help>({'?'}, {"help"}, "display this help and exit")
+        .flag<GreetOption::Message, std::string>({'g'}, {"greet"}, "STRING", "greeting message", "Hello")
+        .flag<GreetOption::Decorate>({}, {"decorate"}, "decorate message")
         .argument<GreetOption::Name, std::string>("NAME")
         ;
     auto const connectCmd = command<ConnectOption>("subcmd connect", "Connect command")
-        .flag<ConnectOption::Help>("?", "help", "display this help and exit")
-        .flag<ConnectOption::Host, std::string>("h", "host", "HOST", "host name", "localhost")
-        .flag<ConnectOption::Port, int>("p", "port", "PORT", "port number", 8080)
+        .flag<ConnectOption::Help>({'?'}, {"help"}, "display this help and exit")
+        .flag<ConnectOption::Host, std::string>({'h'}, {"host"}, "HOST", "host name", "localhost")
+        .flag<ConnectOption::Port, int>({'p'}, {"port"}, "PORT", "port number", 8080)
         ;
     auto const cmd = command<Option>("subcmd", "Test program for sub commands")
-        .flag<Option::Help>("?", "help", "display this help and exit")
+        .flag<Option::Help>({'?'}, {"help"}, "display this help and exit")
         .subcommand<Option::Greet>("greet", "Greeting command", greetCmd)
         .subcommand<Option::Connect>("connect", "Connect command", connectCmd)
         ;

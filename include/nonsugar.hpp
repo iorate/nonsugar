@@ -9,24 +9,66 @@
 #ifndef NONSUGAR_HPP
 #define NONSUGAR_HPP
 
+#include <algorithm>
 #include <exception>
+#include <initializer_list>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <tuple>
 #include <type_traits>
 #include <utility>
+#include <vector>
+
+namespace boost {
+
+template <class T>
+class optional;
+
+} // namespace boost;
 
 namespace nonsugar {
+
+template <class T, class = void>
+struct is_optional : std::false_type {};
+
+template <class T>
+struct is_optional<std::unique_ptr<T>> : std::true_type {};
+
+template <class T>
+struct is_optional<std::shared_ptr<T>> : std::true_type {};
+
+template <class T>
+struct is_optional<boost::optional<T>> : std::true_type {};
+
+template <class T, class = void>
+struct is_container : std::false_type {};
+
+template <class T>
+struct is_container<
+    T,
+    std::conditional_t<
+        false,
+        std::tuple<
+            typename T::value_type,
+            typename T::iterator,
+            typename T::size_type,
+            typename T::reference>,
+        void>> : std::true_type
+{};
 
 namespace detail {
 
 template <class String, class OptionType, OptionType Option, class Value>
 struct flag
 {
+    using string_type = String;
+    using option_type = OptionType;
+    using value_type = Value;
     static constexpr OptionType option = Option;
 
-    String short_names;
-    String long_names;
+    std::vector<typename String::value_type> short_names;
+    std::vector<String> long_names;
     String placeholder;
     String help;
     std::shared_ptr<Value> default_value;
@@ -36,6 +78,9 @@ struct flag
 template <class String, class OptionType, OptionType Option, class Command>
 struct subcommand
 {
+    using string_type = String;
+    using option_type = OptionType;
+    using command_type = Command;
     static constexpr OptionType option = Option;
 
     String name;
@@ -46,8 +91,10 @@ struct subcommand
 template <class String, class OptionType, OptionType Option, class Value>
 struct argument
 {
+    using string_type = String;
+    using option_type = OptionType;
+    using value_type = Value;
     static constexpr OptionType option = Option;
-    using value = Value;
 
     String placeholder;
     std::function<void (std::shared_ptr<Value> &, std::shared_ptr<String> const &)> read_value;
@@ -81,17 +128,23 @@ inline auto tuple_append(Tuple const &tuple, T &&t)
 
 } // namespace detail
 
+template <class Command>
+inline typename Command::string_type usage(Command const &);
+
 template <class String, class OptionType, class Flags, class Subcommands, class Arguments>
 class basic_command
 {
 public:
+    using char_type = typename String::value_type;
     using string_type = String;
 
     basic_command(String const &header, String const &footer) : m_header(header), m_footer(footer)
     {}
 
     template <OptionType Option>
-    auto flag(String const &short_names, String const &long_names, String const &help) const
+    auto flag(
+        std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
+        String const &help) const
     {
         detail::flag<String, OptionType, Option, void> f {
             short_names, long_names, {}, help, {}, {} };
@@ -102,8 +155,8 @@ public:
 
     template <OptionType Option, class Value>
     auto flag(
-        String const &short_names, String const &long_names, String const &placeholder, 
-        String const &help) const
+        std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
+        String const &placeholder, String const &help) const
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, {}, {} };
@@ -114,8 +167,8 @@ public:
 
     template <OptionType Option, class Value>
     auto flag(
-        String const &short_names, String const &long_names, String const &placeholder, 
-        String const &help, Value const &default_value) const
+        std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
+        String const &placeholder, String const &help, Value const &default_value) const
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, std::make_shared<Value>(default_value),
@@ -129,11 +182,11 @@ public:
         OptionType Option, class Value, class ReadValue,
         std::enable_if_t<!std::is_convertible<ReadValue, Value>::value> * = nullptr>
     auto flag(
-        String const &short_names, String const &long_names, String const &placeholder, 
-        String const &help, ReadValue read_value) const
+        std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
+        String const &placeholder, String const &help, ReadValue &&read_value) const
     {
         detail::flag<String, OptionType, Option, Value> f {
-            short_names, long_names, placeholder, help, {}, std::move(read_value) };
+            short_names, long_names, placeholder, help, {}, std::forward<ReadValue>(read_value) };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -141,12 +194,13 @@ public:
 
     template <OptionType Option, class Value, class ReadValue>
     auto flag(
-        String const &short_names, String const &long_names, String const &placeholder, 
-        String const &help, Value const &default_value, ReadValue read_value) const
+        std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
+        String const &placeholder, String const &help, Value const &default_value,
+        ReadValue &&read_value) const
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, std::make_shared<Value>(default_value),
-            std::move(read_value) };
+            std::forward<ReadValue>(read_value) };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -183,6 +237,12 @@ public:
 private:
     friend basic_command detail::make_command<>(
         String const &, String const &, Flags const &, Subcommands const &, Arguments const &);
+
+    friend String usage<>(basic_command const &);
+
+    using flag_tuple_type = Flags;
+    using subcommand_tuple_type = Subcommands;
+    using argument_tuple_type = Arguments;
 
     basic_command(
         String const &header, String const &footer, Flags const &flags,
@@ -228,7 +288,7 @@ private:
     template <OptionType Option, class Value>
     static auto get_shared_impl(detail::option_pair<OptionType, Option, Value> const &p)
     {
-        return std::shared_ptr<Value const>(p.value);
+        return std::const_pointer_cast<Value const>(p.value);
     }
 };
 
@@ -268,6 +328,17 @@ struct to_option_map<basic_command<
         typename to_option_pair<Arguments>::type...>;
 };
 
+template <class String>
+using sstream = std::basic_stringstream<typename String::value_type, typename String::traits_type>;
+
+template <class String>
+inline String widen(char const *s)
+{
+    sstream<String> ss;
+    ss << s;
+    return ss.str();
+}
+
 } // namespace detail
 
 template <class String>
@@ -299,10 +370,155 @@ inline auto parse(int argc, Char * const *argv, Command const &command)
     return parse(argv + 1, argv + argc, command);
 }
 
+namespace detail {
+
+struct eat
+{
+    template <class ...Args>
+    constexpr eat(Args &&...) {}
+};
+
+template <class T, class F, std::size_t ...I>
+inline void tuple_for_each_impl(T &&t, F &&f, std::index_sequence<I...>)
+{
+    eat { (f(std::get<I>(t)), void(), 0)... };
+}
+
+template <class T, class F>
+inline void tuple_for_each(T &&t, F &&f)
+{
+    tuple_for_each_impl(
+        std::forward<T>(t), std::forward<F>(f),
+        std::make_index_sequence<std::tuple_size<std::remove_reference_t<T>>::value>());
+}
+
+template <class String>
+inline std::vector<String> lines(String const &s)
+{
+    sstream<String> ss(s);
+    String line;
+    std::vector<String> ret;
+    while (std::getline(ss, line)) ret.push_back(std::move(line));
+    return ret;
+}
+
+template <class Range, class String, class F>
+inline String join_map(Range const &r, String const &sep, F &&f)
+{
+    String ret;
+    bool first = true;
+    for (auto const &e : r) {
+        if (!std::exchange(first, false)) ret += sep;
+        ret += f(e);
+    }
+    return ret;
+}
+
+} // namespace detail
+
 template <class Command>
 inline typename Command::string_type usage(Command const &command)
 {
-    return {};
+    using string_type = typename Command::string_type;
+    detail::sstream<string_type> ss;
+    auto const _ = &detail::widen<string_type>;
+
+    // Usage
+    ss << "Usage: " << command.m_header;
+    if (std::tuple_size<typename Command::flag_tuple_type>::value > 0) {
+        ss << " [OPTION...]";
+    }
+    if (std::tuple_size<typename Command::subcommand_tuple_type>::value > 0) {
+        ss << " <COMMAND> [ARGS...]";
+    }
+    detail::tuple_for_each(command.m_arguments, [&](auto const &arg)
+        {
+            using value_type = typename std::remove_reference_t<decltype(arg)>::value_type;
+            if (is_optional<value_type>::value) {
+                ss << " [" << arg.placeholder << "]";
+            } else if (
+                !std::is_same<value_type, string_type>::value && is_container<value_type>::value) {
+                ss << " [" << arg.placeholder << "...]";
+            } else {
+                ss << " " << arg.placeholder;
+            }
+        });
+    ss << "\n";
+    for (auto const &f : detail::lines(command.m_footer)) {
+        ss << "  " << f << "\n";
+    }
+
+    // Flags
+    if (std::tuple_size<typename Command::flag_tuple_type>::value > 0) {
+        ss << "\nOptions:\n";
+        std::vector<std::tuple<string_type, string_type, string_type>> table;
+        typename string_type::size_type c0_max = 0, c1_max = 0;
+        detail::tuple_for_each(command.m_flags, [&](auto const &flg)
+            {
+                using value_type = typename std::remove_reference_t<decltype(flg)>::value_type;
+                auto const short_ = detail::join_map(flg.short_names, _(", "), [&](auto const c)
+                    {
+                        if (std::is_void<value_type>::value) {
+                            return _("-") + c;
+                        } else if (is_optional<value_type>::value) {
+                            return _("-") + c + _("[") + flg.placeholder + _("]");
+                        } else {
+                            return _("-") + c + _(" ") + flg.placeholder;
+                        }
+                    });
+                auto const long_ = detail::join_map(flg.long_names, _(", "), [&](auto const &s)
+                    {
+                        if (std::is_void<value_type>::value) {
+                            return _("--") + s;
+                        } else if (is_optional<value_type>::value) {
+                            return _("--") + s + _("[=") + flg.placeholder + _("]");
+                        } else {
+                            return _("--") + s + _("=") + flg.placeholder;
+                        }
+                    });
+                auto help = detail::lines(flg.help);
+                if (help.empty()) help.push_back(string_type());
+                bool first = true;
+                for (auto const &h : help) {
+                    if (std::exchange(first, false)) table.emplace_back(short_, long_, h);
+                    else table.emplace_back(string_type(), string_type(), h);
+                }
+                c0_max = std::max(c0_max, short_.size());
+                c1_max = std::max(c1_max, long_.size());
+            });
+        for (auto const &row : table) {
+            ss << "  " << std::get<0>(row);
+            for (auto i = std::get<0>(row).size(); i < c0_max; ++i) ss << " ";
+            ss << "  " << std::get<1>(row);
+            for (auto i = std::get<1>(row).size(); i < c1_max; ++i) ss << " ";
+            ss << "  " << std::get<2>(row) << "\n";
+        }
+    }
+
+    // Subcommands
+    if (std::tuple_size<typename Command::subcommand_tuple_type>::value > 0) {
+        ss << "\nCommands:\n";
+        std::vector<std::tuple<string_type, string_type>> table;
+        typename string_type::size_type c0_max = 0;
+        detail::tuple_for_each(command.m_subcommands, [&](auto const &subcmd)
+            {
+                auto help = detail::lines(subcmd.help);
+                if (help.empty()) help.push_back(string_type());
+                bool first = true;
+                for (auto const &h : help) {
+                    if (std::exchange(first, false)) table.emplace_back(subcmd.name, h);
+                    else table.emplace_back(string_type(), h);
+                }
+                c0_max = std::max(c0_max, subcmd.name.size());
+            });
+        for (auto const &row : table) {
+            ss << "  " << std::get<0>(row);
+            for (auto i = std::get<0>(row).size(); i < c0_max; ++i) ss << " ";
+            ss << "  " << std::get<1>(row) << "\n";
+        }
+    }
+
+    return ss.str();
 }
 
 } // namespace nonsugar
