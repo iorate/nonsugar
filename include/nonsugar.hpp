@@ -10,11 +10,13 @@
 #define NONSUGAR_HPP
 
 #include <algorithm>
+#include <cstddef>
 #include <exception>
 #include <initializer_list>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <regex>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -31,9 +33,6 @@ namespace nonsugar {
 
 template <class T, class = void>
 struct is_optional : std::false_type {};
-
-template <class T>
-struct is_optional<std::unique_ptr<T>> : std::true_type {};
 
 template <class T>
 struct is_optional<std::shared_ptr<T>> : std::true_type {};
@@ -59,20 +58,54 @@ struct is_container<
 
 namespace detail {
 
+template <class T>
+struct optional_traits;
+
+template <class T>
+struct optional_traits<std::shared_ptr<T>>
+{
+    using value_type = T;
+    static std::shared_ptr<T> make_optional(T const &t) { return std::make_shared<T>(t); }
+};
+
+template <class T>
+struct optional_traits<boost::optional<T>>
+{
+    using value_type = T;
+    static boost::optional<T> make_optional(T const &t) { return t; }
+};
+
+template <class String, class T, class = void>
+struct value_of { using type = T; };
+
+template <class String, class T>
+struct value_of<String, T, std::enable_if_t<is_optional<T>::value>>
+{
+    using type = typename optional_traits<T>::value_type;
+};
+
+template <class String, class T>
+struct value_of<
+    String, T,
+    std::enable_if_t<!std::is_same<String, T>::value && is_container<T>::value>>
+{
+    using type = typename T::value_type;
+};
+
 template <class String, class OptionType, OptionType Option, class Value>
 struct flag
 {
     using string_type = String;
     using option_type = OptionType;
     using value_type = Value;
-    static constexpr OptionType option = Option;
+    static constexpr OptionType option() { return Option; }
 
     std::vector<typename String::value_type> short_names;
     std::vector<String> long_names;
     String placeholder;
     String help;
     std::shared_ptr<Value> default_value;
-    std::function<void (std::shared_ptr<Value> &, std::shared_ptr<String> const &)> read_value;
+    std::function<std::shared_ptr<typename value_of<String, Value>::type> (String const &)> read;
 };
 
 template <class String, class OptionType, OptionType Option, class Command>
@@ -81,7 +114,7 @@ struct subcommand
     using string_type = String;
     using option_type = OptionType;
     using command_type = Command;
-    static constexpr OptionType option = Option;
+    static constexpr OptionType option() { return Option; }
 
     String name;
     String help;
@@ -94,13 +127,77 @@ struct argument
     using string_type = String;
     using option_type = OptionType;
     using value_type = Value;
-    static constexpr OptionType option = Option;
+    static constexpr OptionType option() { return Option; }
 
     String placeholder;
-    std::function<void (std::shared_ptr<Value> &, std::shared_ptr<String> const &)> read_value;
+    std::function<std::shared_ptr<typename value_of<String, Value>::type> (String const &)> read;
 };
 
+template <class String>
+using sstream = std::basic_stringstream<typename String::value_type, typename String::traits_type>;
+
+template <class String>
+inline String widen(char const *s)
+{
+    sstream<String> ss;
+    ss << s;
+    return ss.str();
+}
+
 } // namespace detail
+
+template <class String>
+class basic_error : public std::exception
+{
+public:
+    explicit basic_error(String const &message) : m_message(message) {}
+
+    char const *what() const noexcept override { return "nonsugar::basic_error"; }
+    String message() const { return m_message; }
+
+private:
+    String m_message;
+};
+
+using error = basic_error<std::string>;
+using werror = basic_error<std::wstring>;
+
+namespace detail {
+
+template <class String>
+[[noreturn]] void throw_error(char const *message)
+{
+    throw basic_error<String>(widen<String>(message));
+}
+
+} // namespace detail
+
+template <class String, class T, class = void>
+struct default_read
+{
+    std::shared_ptr<T> operator()(String const &s) const
+    {
+        T t;
+        detail::sstream<String> ss(s);
+        ss >> t;
+        return ss && (ss.peek(), ss.eof()) ? std::make_shared<T>(t) : nullptr;
+    }
+};
+
+template <class String>
+struct default_read<String, void>
+{
+    std::shared_ptr<void> operator()(String const &) const { return nullptr; }
+};
+
+template <class String>
+struct default_read<String, String>
+{
+    std::shared_ptr<String> operator()(String const &s) const
+    {
+        return std::make_shared<String>(s);
+    }
+};
 
 template <
     class String,
@@ -128,9 +225,6 @@ inline auto tuple_append(Tuple const &tuple, T &&t)
 
 } // namespace detail
 
-template <class Command>
-inline typename Command::string_type usage(Command const &);
-
 template <class String, class OptionType, class Flags, class Subcommands, class Arguments>
 class basic_command
 {
@@ -138,7 +232,18 @@ public:
     using char_type = typename String::value_type;
     using string_type = String;
 
+    using flag_tuple_type = Flags;
+    using subcommand_tuple_type = Subcommands;
+    using argument_tuple_type = Arguments;
+
     basic_command(String const &header, String const &footer) : m_header(header), m_footer(footer)
+    {}
+
+    basic_command(
+        String const &header, String const &footer, Flags const &flags,
+        Subcommands const &subcommands, Arguments const &arguments) :
+        m_header(header), m_footer(footer), m_flags(flags), m_subcommands(subcommands),
+        m_arguments(arguments)
     {}
 
     template <OptionType Option>
@@ -147,7 +252,7 @@ public:
         String const &help) const
     {
         detail::flag<String, OptionType, Option, void> f {
-            short_names, long_names, {}, help, {}, {} };
+            short_names, long_names, {}, help, {}, default_read<String, void>() };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -159,7 +264,8 @@ public:
         String const &placeholder, String const &help) const
     {
         detail::flag<String, OptionType, Option, Value> f {
-            short_names, long_names, placeholder, help, {}, {} };
+            short_names, long_names, placeholder, help, {},
+            default_read<String, typename detail::value_of<String, Value>::type>() };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -172,35 +278,35 @@ public:
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, std::make_shared<Value>(default_value),
-            {} };
+            default_read<String, typename detail::value_of<String, Value>::type>() };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
     }
 
     template <
-        OptionType Option, class Value, class ReadValue,
-        std::enable_if_t<!std::is_convertible<ReadValue, Value>::value> * = nullptr>
+        OptionType Option, class Value, class Read,
+        std::enable_if_t<!std::is_convertible<Read, Value>::value> * = nullptr>
     auto flag(
         std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
-        String const &placeholder, String const &help, ReadValue &&read_value) const
+        String const &placeholder, String const &help, Read &&read) const
     {
         detail::flag<String, OptionType, Option, Value> f {
-            short_names, long_names, placeholder, help, {}, std::forward<ReadValue>(read_value) };
+            short_names, long_names, placeholder, help, {}, std::forward<Read>(read) };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
     }
 
-    template <OptionType Option, class Value, class ReadValue>
+    template <OptionType Option, class Value, class Read>
     auto flag(
         std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
         String const &placeholder, String const &help, Value const &default_value,
-        ReadValue &&read_value) const
+        Read &&read) const
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, std::make_shared<Value>(default_value),
-            std::forward<ReadValue>(read_value) };
+            std::forward<Read>(read) };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -218,38 +324,22 @@ public:
     template <OptionType Option, class Value>
     auto argument(String const &placeholder) const
     {
-        detail::argument<String, OptionType, Option, Value> a { placeholder, {} };
+        detail::argument<String, OptionType, Option, Value> a {
+            placeholder, default_read<String, typename detail::value_of<String, Value>::type>() };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, m_flags, m_subcommands,
             detail::tuple_append(m_arguments, std::move(a)));
     }
 
-    template <OptionType Option, class Value, class ReadValue>
-    auto argument(String const &placeholder, ReadValue read_value) const
+    template <OptionType Option, class Value, class Read>
+    auto argument(String const &placeholder, Read &&read) const
     {
         detail::argument<String, OptionType, Option, Value> a {
-            placeholder, std::move(read_value) };
+            placeholder, std::forward<Read>(read) };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, m_flags, m_subcommands,
             detail::tuple_append(m_arguments, std::move(a)));
     }
-
-private:
-    friend basic_command detail::make_command<>(
-        String const &, String const &, Flags const &, Subcommands const &, Arguments const &);
-
-    friend String usage<>(basic_command const &);
-
-    using flag_tuple_type = Flags;
-    using subcommand_tuple_type = Subcommands;
-    using argument_tuple_type = Arguments;
-
-    basic_command(
-        String const &header, String const &footer, Flags const &flags,
-        Subcommands const &subcommands, Arguments const &arguments) :
-        m_header(header), m_footer(footer), m_flags(flags), m_subcommands(subcommands),
-        m_arguments(arguments)
-    {}
 
     String m_header;
     String m_footer;
@@ -269,33 +359,55 @@ struct option_pair
     std::shared_ptr<Value> value;
 };
 
+template <class Command>
+struct to_option_map;
+
 } // namespace detail
+
+template <class Iterator, class Command>
+inline typename detail::to_option_map<Command>::type parse(Iterator, Iterator, Command const &);
 
 template <class OptionType, class ...Pairs>
 class option_map : private Pairs...
 {
+private:
+    template <class Iterator, class Command>
+    friend typename detail::to_option_map<Command>::type parse(Iterator, Iterator, Command const &);
+
+    template <OptionType Option, class Value>
+    static auto &priv_value_impl(detail::option_pair<OptionType, Option, Value> &p)
+    {
+        return p.value;
+    }
+    
+    template <OptionType Option, class Value>
+    static auto const &priv_value_impl(detail::option_pair<OptionType, Option, Value> const &p)
+    {
+        return p.value;
+    }
+    
+    template <OptionType Option>
+    auto const &priv_value() const { return priv_value_impl<Option>(*this); }
+
+    template <OptionType Option>
+    auto &priv_value() { return priv_value_impl<Option>(*this); }
+    
 public:
     template <OptionType Option>
-    bool has() const { return static_cast<bool>(get_shared<Option>()); }
+    using type = typename std::remove_reference_t<
+        decltype(priv_value_impl<Option>(std::declval<option_map const &>()))>::element_type;
+    
+    template <OptionType Option>
+    bool has() const { return static_cast<bool>(priv_value<Option>()); }
 
     template <OptionType Option>
-    auto get() const { return *get_shared<Option>(); }
+    auto get() const { return *priv_value<Option>(); }
 
     template <OptionType Option>
-    auto get_shared() const { return get_shared_impl<Option>(*this); }
-
-private:
-    template <OptionType Option, class Value>
-    static auto get_shared_impl(detail::option_pair<OptionType, Option, Value> const &p)
-    {
-        return std::const_pointer_cast<Value const>(p.value);
-    }
+    auto get_shared() const { return priv_value<Option>(); }
 };
 
 namespace detail {
-
-template <class Command>
-struct to_option_map;
 
 template <class>
 struct to_option_pair;
@@ -328,50 +440,6 @@ struct to_option_map<basic_command<
         typename to_option_pair<Arguments>::type...>;
 };
 
-template <class String>
-using sstream = std::basic_stringstream<typename String::value_type, typename String::traits_type>;
-
-template <class String>
-inline String widen(char const *s)
-{
-    sstream<String> ss;
-    ss << s;
-    return ss.str();
-}
-
-} // namespace detail
-
-template <class String>
-class basic_error : public std::exception
-{
-public:
-    explicit basic_error(String const &message) : m_message(message) {}
-
-    char const *what() const noexcept override { return "nonsugar::basic_error"; }
-    String message() const { return m_message; }
-
-private:
-    String m_message;
-};
-
-using error = basic_error<std::string>;
-using werror = basic_error<std::wstring>;
-
-template <class Iterator, class Command>
-inline typename detail::to_option_map<Command>::type parse(
-    Iterator arg_first, Iterator arg_last, Command const &command)
-{
-    return {};
-}
-
-template <class Char, class Command>
-inline auto parse(int argc, Char * const *argv, Command const &command)
-{
-    return parse(argv + 1, argv + argc, command);
-}
-
-namespace detail {
-
 struct eat
 {
     template <class ...Args>
@@ -391,6 +459,110 @@ inline void tuple_for_each(T &&t, F &&f)
         std::forward<T>(t), std::forward<F>(f),
         std::make_index_sequence<std::tuple_size<std::remove_reference_t<T>>::value>());
 }
+
+template <class String, class Value, class = void>
+struct parse_argument
+{
+    template <class Iterator, class Argument>
+    void operator()(
+        Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg) const
+    {
+        if (it == last) {
+            throw basic_error<String>(widen<String>("argument required: ") + arg.placeholder);
+        }
+        auto const v = arg.read(*it);
+        if (!v) {
+            throw basic_error<String>(
+                widen<String>("bad argument: ") + arg.placeholder + widen<String>("=") + *it);
+        }
+        ++it;
+        value = v;
+    }
+};
+
+template <class String, class Value>
+struct parse_argument<String, Value, std::enable_if_t<is_optional<Value>::value>>
+{
+    template <class Iterator, class Argument>
+    void operator()(
+        Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg) const
+    {
+        if (it == last) {
+            value = std::make_shared<Value>();
+        } else {
+            auto const v = arg.read(*it);
+            if (!v) {
+                throw basic_error<String>(
+                    widen<String>("bad argument: ") + arg.placeholder + widen<String>("=") + *it);
+            }
+            ++it;
+            value = std::make_shared<Value>(optional_traits<Value>::make_optional(*v));
+        }
+    }
+};
+
+template <class String, class Value>
+struct parse_argument<
+    String, Value,
+    std::enable_if_t<!std::is_same<String, Value>::value && is_container<Value>::value>>
+{
+    template <class Iterator, class Argument>
+    void operator()(
+        Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg) const
+    {
+        value = std::make_shared<Value>();
+        while (it != last) {
+            std::shared_ptr<typename Value::value_type> v;
+            parse_argument<String, typename Value::value_type>()(it, last, v, arg);
+            value->push_back(std::move(*v));
+        }
+    }
+};
+
+} // namespace detail
+
+template <class Iterator, class Command>
+inline typename detail::to_option_map<Command>::type parse(
+    Iterator arg_first, Iterator arg_last, Command const &command)
+{
+    using string_type = typename Command::string_type;
+    auto const _ = &detail::widen<string_type>;
+
+    typename detail::to_option_map<Command>::type opts;
+    detail::tuple_for_each(command.m_flags, [&](auto const &flg)
+        {
+            constexpr auto option = std::remove_reference_t<decltype(flg)>::option();
+            opts.template priv_value<option>() = flg.default_value;
+        });
+
+    auto arg_it = arg_first;
+    for (auto arg_it = arg_first; arg_it != arg_last; ++arg_it) {
+        string_type const cur = *arg_it;
+        if (cur == _("--")) {
+            ++arg_it;
+            break;
+        }
+    }
+
+    detail::tuple_for_each(command.m_arguments, [&](auto const &arg)
+        {
+            using argument_type = std::remove_cv_t<std::remove_reference_t<decltype(arg)>>;
+            using value_type = typename argument_type::value_type;
+            constexpr auto option = argument_type::option();
+            detail::parse_argument<string_type, value_type>()(
+                arg_it, arg_last, opts.template priv_value<option>(), arg);
+        });
+
+    return opts;
+}
+
+template <class Char, class Command>
+inline auto parse(int argc, Char * const *argv, Command const &command)
+{
+    return parse(argv + 1, argv + argc, command);
+}
+
+namespace detail {
 
 template <class String>
 inline std::vector<String> lines(String const &s)

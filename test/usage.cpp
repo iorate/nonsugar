@@ -13,6 +13,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <boost/optional.hpp>
 #include <nonsugar.hpp>
 
 BOOST_AUTO_TEST_CASE(usage_argument)
@@ -22,9 +23,9 @@ BOOST_AUTO_TEST_CASE(usage_argument)
     auto const cmd = command<Option>("usage", "usage test\nyes usage test")
         .flag<Option::A>({'a'}, {"absorb"}, "HOGE")
         .flag<Option::B, int>({'b','B'}, {"burn"}, "N", "Once upon a time,\nthere is...")
-        .flag<Option::C, std::unique_ptr<int>>({'c'}, {"color","colour"}, "COLOR", "Set color")
+        .flag<Option::C, boost::optional<int>>({'c'}, {"color","colour"}, "COLOR", "Set color")
         .argument<Option::D, std::string>("NAME")
-        .argument<Option::E, std::shared_ptr<int>>("NUMBER")
+        .argument<Option::E, boost::optional<int>>("NUMBER")
         .argument<Option::F, std::vector<std::string>>("PATHS")
         ;
     BOOST_TEST(usage(cmd) ==
