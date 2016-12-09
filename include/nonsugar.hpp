@@ -13,6 +13,7 @@
 #include <cstddef>
 #include <exception>
 #include <initializer_list>
+#include <iterator>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -461,6 +462,177 @@ inline void tuple_for_each(T &&t, F &&f)
 }
 
 template <class String, class Value, class = void>
+struct parse_flag_long
+{
+    template <class Iterator, class Flag>
+    void operator()(
+        std::match_results<typename String::const_iterator> const &match,
+        Iterator &arg_it, Iterator arg_last,
+        std::shared_ptr<Value> &value, Flag const &flg, String &err) const
+    {
+        String s;
+        if (!match[2].matched) {
+            ++arg_it;
+            if (arg_it == arg_last) {
+                err = widen<String>("argument required: ") + match.str(0);
+                return;
+            }
+            s = *arg_it;
+        } else {
+            s = match.str(2);
+        }
+        auto const v = flg.read(s);
+        if (!v) {
+            err = widen<String>("invalid argument: --") + match.str(1) + widen<String>("=") + s;
+            return;
+        }
+        value = v;
+    }
+};
+
+template <class String>
+struct parse_flag_long<String, void, void>
+{
+    template <class Iterator, class Flag>
+    void operator()(
+        std::match_results<typename String::const_iterator> const &match, Iterator &, Iterator,
+        std::shared_ptr<void> &value, Flag const &, String &err) const
+    {
+        if (match[2].matched) {
+            err = widen<String>("argument not allowed: ") + match.str(0);
+            return;
+        }
+        value = std::make_shared<int>();
+    }
+};
+
+template <class String, class Value>
+struct parse_flag_long<String, Value, std::enable_if_t<is_optional<Value>::value>>
+{
+    template <class Iterator, class Flag>
+    void operator()(
+        std::match_results<typename String::const_iterator> const &match, Iterator &, Iterator,
+        std::shared_ptr<Value> &value, Flag const &flg, String &err) const
+    {
+        if (!match[2].matched) {
+            value = std::make_shared<Value>();
+        } else {
+            auto const v = flg.read(match.str(2));
+            if (!v) {
+                err = widen<String>("invalid argument: ") + match.str(0);
+                return;
+            }
+            value = std::make_shared<Value>(optional_traits<Value>::make_optional(*v));
+        }
+    }
+};
+
+template <class String, class Value>
+struct parse_flag_long<
+    String, Value,
+    std::enable_if_t<!std::is_same<String, Value>::value && is_container<Value>::value>>
+{
+    template <class Iterator, class Flag>
+    void operator()(
+        std::match_results<typename String::const_iterator> const &match,
+        Iterator &arg_it, Iterator arg_last,
+        std::shared_ptr<Value> &value, Flag const &flg, String &err) const
+    {
+        std::shared_ptr<typename Value::value_type> v;
+        parse_flag_long<String, typename Value::value_type>()(
+            match, arg_it, arg_last, v, flg, err);
+        if (!err.empty()) return;
+        if (!value) value = std::make_shared<Value>();
+        value->push_back(std::move(*v));
+    }
+};
+
+template <class String, class Value, class = void>
+struct parse_flag_short
+{
+    template <class NameIt, class ArgIt, class Flag>
+    void operator()(
+        NameIt &it, NameIt last, ArgIt &arg_it, ArgIt arg_last,
+        std::shared_ptr<Value> &value, Flag const &flg, String &err) const
+    {
+        auto const name = *it;
+        String s;
+        if (std::next(it) == last) {
+            ++arg_it;
+            if (arg_it == arg_last) {
+                err = widen<String>("argument required: -") + name;
+                return;
+            }
+            s = *arg_it;
+        } else {
+            s = String(std::next(it), last);
+            it = std::prev(last);
+        }
+        auto const v = flg.read(s);
+        if (!v) {
+            err = widen<String>("invalid argument: -") + name + widen<String>(" ") + s;
+            return;
+        }
+        value = v;
+    }
+};
+
+template <class String>
+struct parse_flag_short<String, void, void>
+{
+    template <class NameIt, class ArgIt, class Flag>
+    void operator()(
+        NameIt &, NameIt, ArgIt &, ArgIt,
+        std::shared_ptr<void> &value, Flag const &, String &) const
+    {
+        value = std::make_shared<int>();
+    }
+};
+
+template <class String, class Value>
+struct parse_flag_short<String, Value, std::enable_if_t<is_optional<Value>::value>>
+{
+    template <class NameIt, class ArgIt, class Flag>
+    void operator()(
+        NameIt &it, NameIt last, ArgIt &arg_it, ArgIt arg_last,
+        std::shared_ptr<Value> &value, Flag const &flg, String &err) const
+    {
+        auto const name = *it;
+        if (std::next(it) == last) {
+            value = std::make_shared<Value>();
+        } else {
+            auto const s = String(std::next(it), last);
+            it = std::prev(last);
+            auto const v = flg.read(s);
+            if (!v) {
+                err = widen<String>("invalid argument: -") + name + widen<String>(" ") + s;
+                return;
+            }
+            value = std::make_shared<Value>(optional_traits<Value>::make_optional(*v));
+        }
+    }
+};
+
+template <class String, class Value>
+struct parse_flag_short<
+    String, Value,
+    std::enable_if_t<!std::is_same<String, Value>::value && is_container<Value>::value>>
+{
+    template <class NameIt, class ArgIt, class Flag>
+    void operator()(
+        NameIt &it, NameIt last, ArgIt &arg_it, ArgIt arg_last,
+        std::shared_ptr<Value> &value, Flag const &flg, String &err) const
+    {
+        std::shared_ptr<typename Value::value_type> v;
+        parse_flag_short<String, typename Value::value_type>()(
+            it, last, arg_it, arg_last, v, flg, err);
+        if (!err.empty()) return;
+        value = std::make_shared<Value>();
+        value->push_back(std::move(*v));
+    }
+};
+
+template <class String, class Value, class = void>
 struct parse_argument
 {
     template <class Iterator, class Argument>
@@ -532,6 +704,7 @@ inline typename detail::to_option_map<Command>::type parse(
 {
     using string_type = typename Command::string_type;
     using error_type = basic_error<string_type>;
+    using regex_type = std::basic_regex<typename string_type::value_type>;
     auto const _ = &detail::widen<string_type>;
 
     typename detail::to_option_map<Command>::type opts;
@@ -548,9 +721,96 @@ inline typename detail::to_option_map<Command>::type parse(
             ++arg_it;
             break;
         }
-        if (!cur.empty() && cur[0] == _("-")[0]) {
-            // nop
+        std::match_results<typename string_type::const_iterator> match;
+        if (std::regex_match(cur, match, regex_type(_("--([^=]+)(?:=(.*))?")))) {
+            // long flag
+            auto const name = match.str(1);
+            std::vector<string_type> exact_matches, partial_matches;
+            detail::tuple_for_each(command.m_flags, [&](auto const &flg)
+                {
+                    for (auto const &long_name : flg.long_names) {
+                        if (name == long_name) {
+                            exact_matches.push_back(long_name);
+                        }
+                        else if (
+                            name.size() <= long_name.size() &&
+                            std::equal(name.begin(), name.end(), long_name.begin())) {
+                            partial_matches.push_back(long_name);
+                        }
+                    }
+                });
+            if (exact_matches.empty()) {
+                if (partial_matches.empty()) {
+                    throw error_type(command.m_header + _(": unrecognized option: --") + name);
+                } else if (partial_matches.size() >= 2) {
+                    detail::sstream<string_type> ss;
+                    ss << command.m_header << ": ambiguous option: --" << name << " [";
+                    bool first = true;
+                    for (auto const &pm : partial_matches) {
+                        if (!std::exchange(first, false)) ss << ", ";
+                        ss << "--" << pm;
+                    }
+                    ss << "]";
+                    throw error_type(ss.str());
+                }
+            } else if (exact_matches.size() >= 2) {
+                throw error_type(command.m_header + _(": ambiguous option: --") + name);
+            }
+            detail::tuple_for_each(command.m_flags, [&](auto const &flg)
+                {
+                    using flag_type = std::remove_cv_t<std::remove_reference_t<decltype(flg)>>;
+                    using value_type = typename flag_type::value_type;
+                    constexpr auto option = flag_type::option();
+                    for (auto const &long_name : flg.long_names) {
+                        if (name.size() <= long_name.size() &&
+                            std::equal(name.begin(), name.end(), long_name.begin())) {
+                            string_type err;
+                            detail::parse_flag_long<string_type, value_type>()(
+                                match, arg_it, arg_last,
+                                opts.template priv_value<option>(), flg, err);
+                            if (!err.empty()) {
+                                throw error_type(command.m_header + _(": ") + err);
+                            }
+                        }
+                    }
+                });
+        } else if (std::regex_match(cur, match, regex_type(_("-(.+)")))) {
+            // short flag
+            for (auto it = match[1].first; it != match[1].second; ++it) {
+                auto const name = *it;
+                std::vector<typename string_type::value_type> matches;
+                detail::tuple_for_each(command.m_flags, [&](auto const &flg)
+                    {
+                        for (auto short_name : flg.short_names) {
+                            if (name == short_name) {
+                                matches.push_back(short_name);
+                            }
+                        }
+                    });
+                if (matches.empty()) {
+                    throw error_type(command.m_header + _(": unrecognized option: -") + name);
+                } else if (matches.size() >= 2) {
+                    throw error_type(command.m_header + _(": ambiguous option: -") + name);
+                }
+                detail::tuple_for_each(command.m_flags, [&](auto const &flg)
+                    {
+                        using flag_type = std::remove_cv_t<std::remove_reference_t<decltype(flg)>>;
+                        using value_type = typename flag_type::value_type;
+                        constexpr auto option = flag_type::option();
+                        if (std::find(flg.short_names.begin(), flg.short_names.end(), name) !=
+                            flg.short_names.end()) {
+                            string_type err;
+                            detail::parse_flag_short<string_type, value_type>()(
+                                it, match[1].second, arg_it, arg_last,
+                                opts.template priv_value<option>(), flg, err);
+                            if (!err.empty()) {
+                                throw error_type(command.m_header + _(": ") + err);
+                            }
+                        }
+                    });
+            }
         } else {
+            // subcommand or argument
             break;
         }
     }
