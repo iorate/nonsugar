@@ -28,7 +28,7 @@ BOOST_AUTO_TEST_CASE(mock)
             {
                 return std::make_shared<int>(std::stoi(str));
             })
-        .flag<SubOption::E, int>({}, {"enum"}, "X", "set X (100-200) default: 150", 150,
+        .flag<SubOption::E, int>({'e'}, {"enum"}, "X", "set X (100-200) default: 150", 150,
             [](auto const &str)
             {
                 auto const n = std::stoi(str);
@@ -44,11 +44,11 @@ BOOST_AUTO_TEST_CASE(mock)
         .flag<Option::A>({'a'}, {"abort"}, "abort")
         .subcommand<Option::B>("sub", "test subcommand", subcmd)
         ;
-    std::vector<std::string> const args = { "mock", "sub", "-ab10", "-e", "120" };
+    std::vector<std::string> const args = { "sub", "-ab10", "-e120", "fake", "great" };
     auto const opts = parse(args.begin(), args.end(), cmd);
     if (opts.has<Option::B>()) {
         auto const subopts = opts.get<Option::B>();
         auto const code = subopts.get_shared<SubOption::C>();
-        *code;
+        // *code;
     }
 }

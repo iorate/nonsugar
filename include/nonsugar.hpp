@@ -465,15 +465,17 @@ struct parse_argument
 {
     template <class Iterator, class Argument>
     void operator()(
-        Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg) const
+        Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg,
+        String &err) const
     {
         if (it == last) {
-            throw basic_error<String>(widen<String>("argument required: ") + arg.placeholder);
+            err = widen<String>("argument required: ") + arg.placeholder;
+            return;
         }
         auto const v = arg.read(*it);
         if (!v) {
-            throw basic_error<String>(
-                widen<String>("bad argument: ") + arg.placeholder + widen<String>("=") + *it);
+            err = widen<String>("bad argument: ") + arg.placeholder + widen<String>("=") + *it;
+            return;
         }
         ++it;
         value = v;
@@ -485,15 +487,16 @@ struct parse_argument<String, Value, std::enable_if_t<is_optional<Value>::value>
 {
     template <class Iterator, class Argument>
     void operator()(
-        Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg) const
+        Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg,
+        String &err) const
     {
         if (it == last) {
             value = std::make_shared<Value>();
         } else {
             auto const v = arg.read(*it);
             if (!v) {
-                throw basic_error<String>(
-                    widen<String>("bad argument: ") + arg.placeholder + widen<String>("=") + *it);
+                err = widen<String>("bad argument: ") + arg.placeholder + widen<String>("=") + *it;
+                return;
             }
             ++it;
             value = std::make_shared<Value>(optional_traits<Value>::make_optional(*v));
@@ -508,12 +511,14 @@ struct parse_argument<
 {
     template <class Iterator, class Argument>
     void operator()(
-        Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg) const
+        Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg,
+        String &err) const
     {
         value = std::make_shared<Value>();
         while (it != last) {
             std::shared_ptr<typename Value::value_type> v;
-            parse_argument<String, typename Value::value_type>()(it, last, v, arg);
+            parse_argument<String, typename Value::value_type>()(it, last, v, arg, err);
+            if (!err.empty()) return;
             value->push_back(std::move(*v));
         }
     }
@@ -526,6 +531,7 @@ inline typename detail::to_option_map<Command>::type parse(
     Iterator arg_first, Iterator arg_last, Command const &command)
 {
     using string_type = typename Command::string_type;
+    using error_type = basic_error<string_type>;
     auto const _ = &detail::widen<string_type>;
 
     typename detail::to_option_map<Command>::type opts;
@@ -536,12 +542,47 @@ inline typename detail::to_option_map<Command>::type parse(
         });
 
     auto arg_it = arg_first;
-    for (auto arg_it = arg_first; arg_it != arg_last; ++arg_it) {
-        string_type const cur = *arg_it;
+    for (; arg_it != arg_last; ++arg_it) {
+        auto const cur = *arg_it;
         if (cur == _("--")) {
             ++arg_it;
             break;
         }
+        if (!cur.empty() && cur[0] == _("-")[0]) {
+            // nop
+        } else {
+            break;
+        }
+    }
+
+    if (std::tuple_size<typename Command::subcommand_tuple_type>::value != 0 &&
+        arg_it != arg_last) {
+        bool given = false;
+        detail::tuple_for_each(command.m_subcommands, [&](auto const &subcmd)
+            {
+                if (subcmd.name == *arg_it) {
+                    if (std::exchange(given, true)) {
+                        throw error_type(
+                            command.m_header + _(": ambiguous subcommand: ") + *arg_it);
+                    }
+                }
+            });
+        if (!given) {
+            throw error_type(command.m_header + _(": unrecognized subcommand: ") + *arg_it);
+        }
+        detail::tuple_for_each(command.m_subcommands, [&](auto const &subcmd)
+            {
+                if (subcmd.name == *arg_it) {
+                    using subcommand_type = std::remove_cv_t<
+                        std::remove_reference_t<decltype(subcmd)>>;
+                    constexpr auto option = subcommand_type::option();
+                    ++arg_it;
+                    opts.template priv_value<option>() =
+                        std::make_shared<typename decltype(opts)::template type<option>>(
+                            parse(arg_it, arg_last, subcmd.command));
+                }
+            });
+        return opts;
     }
 
     detail::tuple_for_each(command.m_arguments, [&](auto const &arg)
@@ -549,9 +590,17 @@ inline typename detail::to_option_map<Command>::type parse(
             using argument_type = std::remove_cv_t<std::remove_reference_t<decltype(arg)>>;
             using value_type = typename argument_type::value_type;
             constexpr auto option = argument_type::option();
+            string_type err;
             detail::parse_argument<string_type, value_type>()(
-                arg_it, arg_last, opts.template priv_value<option>(), arg);
+                arg_it, arg_last, opts.template priv_value<option>(), arg, err);
+            if (!err.empty()) {
+                throw error_type(command.m_header + _(": ") + err);
+            }
         });
+
+    if (arg_it != arg_last) {
+        throw error_type(command.m_header + _(": unrecognized argument: ") + *arg_it);
+    }
 
     return opts;
 }

@@ -47,7 +47,7 @@ BOOST_AUTO_TEST_CASE(argument_success2)
 
 BOOST_AUTO_TEST_CASE(argument_failure1)
 {
-    auto const cmd = command<char>("argument test", "test argument error")
+    auto const cmd = command<char>("foobar", "test argument error")
         .argument<'N', std::string>("NAME")
         .argument<'A', int>("A_INT")
         .argument<'B', boost::optional<int>>("B_INT")
@@ -57,22 +57,22 @@ BOOST_AUTO_TEST_CASE(argument_failure1)
         std::vector<std::string> args = {};
         parse(args.begin(), args.end(), cmd);
     } catch (error const &e) {
-        BOOST_TEST(e.message() == "argument required: NAME");
+        BOOST_TEST(e.message() == "foobar: argument required: NAME");
         try {
             std::vector<std::string> args = { "iorate", "foo" };
             parse(args.begin(), args.end(), cmd);
         } catch (error const &e) {
-            BOOST_TEST(e.message() == "bad argument: A_INT=foo");
+            BOOST_TEST(e.message() == "foobar: bad argument: A_INT=foo");
             try {
                 std::vector<std::string> args = { "iorate", "12", "bar" };
                 parse(args.begin() , args.end(), cmd);
             } catch (error const &e) {
-                BOOST_TEST(e.message() == "bad argument: B_INT=bar");
+                BOOST_TEST(e.message() == "foobar: bad argument: B_INT=bar");
                 try {
                     std::vector<std::string> args = { "iorate", "12", "23", "34", "baz" };
                     parse(args.begin(), args.end(), cmd);
                 } catch (error const &e) {
-                    BOOST_TEST(e.message() == "bad argument: C_INT=baz");
+                    BOOST_TEST(e.message() == "foobar: bad argument: C_INT=baz");
                     return;
                 }
             }
