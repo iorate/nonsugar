@@ -15,36 +15,36 @@
 #include <vector>
 #include <nonsugar.hpp>
 
-BOOST_AUTO_TEST_CASE(mock)
+BOOST_AUTO_TEST_CASE(mock_wstring)
 {
     using namespace nonsugar;
     enum class SubOption { A, B, C, D, E, F, G };
-    auto const subcmd = command<SubOption>("mock sub", "subcommand test")
-        .flag<SubOption::A>({'a'}, {"active"}, "be active")
-        .flag<SubOption::B, int>({'b'}, {"buy"}, "N", "buy N dollars")
-        .flag<SubOption::C, int>({'c'}, {"code"}, "C", "set the code to C", 100)
-        .flag<SubOption::D, int>({'d'}, {"dump"}, "N", "dump N times",
+    auto const subcmd = wcommand<SubOption>(L"mock sub", L"subcommand test")
+        .flag<SubOption::A>({L'a'}, {L"active"}, L"be active")
+        .flag<SubOption::B, int>({L'b'}, {L"buy"}, L"N", L"buy N dollars")
+        .flag<SubOption::C, int>({L'c'}, {L"code"}, L"C", L"set the code to C", 100)
+        .flag<SubOption::D, int>({L'd'}, {L"dump"}, L"N", L"dump N times",
             [](auto const &str)
             {
                 return std::make_shared<int>(std::stoi(str));
             })
-        .flag<SubOption::E, int>({'e'}, {"enum"}, "X", "set X (100-200) default: 150", 150,
+        .flag<SubOption::E, int>({L'e'}, {L"enum"}, L"X", L"set X (100-200) default: 150", 150,
             [](auto const &str)
             {
                 auto const n = std::stoi(str);
-                if (n < 100 || 200 < n) throw error("invalid value");
+                if (n < 100 || 200 < n) throw werror(L"invalid value");
                 return std::make_shared<int>(n);
             })
-        .argument<SubOption::F, std::string>("FAKE")
-        .argument<SubOption::G, std::string>(
-            "GREAT", [](auto const &str) { return std::make_shared<std::string>(str); })
+        .argument<SubOption::F, std::wstring>(L"FAKE")
+        .argument<SubOption::G, std::wstring>(
+            L"GREAT", [](auto const &str) { return std::make_shared<std::wstring>(str); })
         ;
     enum class Option { A, B };
-    auto const cmd = command<Option>("mock", "mock test")
-        .flag<Option::A>({'a'}, {"abort"}, "abort")
-        .subcommand<Option::B>("sub", "test subcommand", subcmd)
+    auto const cmd = wcommand<Option>(L"mock", L"mock test")
+        .flag<Option::A>({L'a'}, {L"abort"}, L"abort")
+        .subcommand<Option::B>(L"sub", L"test subcommand", subcmd)
         ;
-    std::vector<std::string> const args = { "sub", "-ab12", "-e", "120", "fake", "great" };
+    std::vector<std::wstring> const args = { L"sub", L"-ab12", L"-e", L"120", L"fake", L"great" };
     auto const opts = parse(args.begin(), args.end(), cmd);
     if (opts.has<Option::B>()) {
         auto const subopts = opts.get<Option::B>();
