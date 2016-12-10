@@ -60,7 +60,13 @@ BOOST_AUTO_TEST_CASE(subcommand_failure1)
             parse(args.begin(), args.end(), cmd);
         } catch (error const &e) {
             BOOST_TEST(e.message() == "calc: unrecognized subcommand: sub");
-            return;
+            try {
+                std::vector<std::string> args = {};
+                parse(args.begin(), args.end(), cmd);
+            } catch (error const &e) {
+                BOOST_TEST(e.message() == "calc: subcommand required");
+                return;
+            }
         }
     }
     BOOST_TEST(false);

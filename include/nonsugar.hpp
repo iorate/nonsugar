@@ -32,49 +32,62 @@ class optional;
 
 namespace nonsugar {
 
-template <class T, class = void>
-struct is_optional : std::false_type {};
-
-template <class T>
-struct is_optional<std::shared_ptr<T>> : std::true_type {};
-
-template <class T>
-struct is_optional<boost::optional<T>> : std::true_type {};
-
-template <class T, class = void>
-struct is_container : std::false_type {};
-
-template <class T>
-struct is_container<
-    T,
-    std::conditional_t<
-        false,
-        std::tuple<
-            typename T::value_type,
-            typename T::iterator,
-            typename T::size_type,
-            typename T::reference>,
-        void>> : std::true_type
-{};
-
 namespace detail {
 
-template <class T>
-struct optional_traits;
+template <class ...>
+using void_t = void;
+
+} // namespace detail
+
+template <class T, class = void>
+struct optional_traits {};
 
 template <class T>
 struct optional_traits<std::shared_ptr<T>>
 {
     using value_type = T;
-    static std::shared_ptr<T> make_optional(T const &t) { return std::make_shared<T>(t); }
+    static std::shared_ptr<T> construct() { return {}; }
+    static std::shared_ptr<T> construct(T const &v) { return std::make_shared<T>(v); }
 };
 
 template <class T>
 struct optional_traits<boost::optional<T>>
 {
     using value_type = T;
-    static boost::optional<T> make_optional(T const &t) { return t; }
+    static boost::optional<T> construct() { return {}; }
+    static boost::optional<T> construct(T const &v) { return v; }
 };
+
+template <class T, class = void>
+struct container_traits {};
+
+template <class T>
+struct container_traits<T, detail::void_t<
+    typename T::value_type, typename T::iterator, typename T::size_type, typename T::reference>>
+{
+    using value_type = typename T::value_type;
+    static T construct() { return {}; }
+    static void push_back(T &t, value_type const &v) { t.push_back(v); }
+};
+
+namespace detail {
+
+template <class T, class = void>
+struct is_optional : std::false_type {};
+
+template <class T>
+struct is_optional<T, void_t<typename optional_traits<T>::value_type>> : std::true_type {};
+
+template <class T, class = void>
+struct is_container : std::false_type {};
+
+template <class T>
+struct is_container<T, void_t<typename container_traits<T>::value_type>> : std::true_type {};
+
+template <class String, class T>
+struct is_container_but_string :
+    std::integral_constant<bool, !std::is_same<String, T>::value && is_container<T>::value>
+{};
 
 template <class String, class T, class = void>
 struct value_of { using type = T; };
@@ -86,18 +99,15 @@ struct value_of<String, T, std::enable_if_t<is_optional<T>::value>>
 };
 
 template <class String, class T>
-struct value_of<
-    String, T,
-    std::enable_if_t<!std::is_same<String, T>::value && is_container<T>::value>>
+struct value_of<String, T, std::enable_if_t<is_container_but_string<String, T>::value>>
 {
-    using type = typename T::value_type;
+    using type = typename value_of<String, typename container_traits<T>::value_type>::type;
 };
 
 template <class String, class OptionType, OptionType Option, class Value>
 struct flag
 {
     using string_type = String;
-    using option_type = OptionType;
     using value_type = Value;
     static constexpr OptionType option() { return Option; }
 
@@ -107,13 +117,13 @@ struct flag
     String help;
     std::shared_ptr<Value> default_value;
     std::function<std::shared_ptr<typename value_of<String, Value>::type> (String const &)> read;
+    bool is_help_or_version = false;
 };
 
 template <class String, class OptionType, OptionType Option, class Command>
 struct subcommand
 {
     using string_type = String;
-    using option_type = OptionType;
     using command_type = Command;
     static constexpr OptionType option() { return Option; }
 
@@ -126,7 +136,6 @@ template <class String, class OptionType, OptionType Option, class Value>
 struct argument
 {
     using string_type = String;
-    using option_type = OptionType;
     using value_type = Value;
     static constexpr OptionType option() { return Option; }
 
@@ -143,6 +152,18 @@ inline String widen(char const *s)
     sstream<String> ss;
     ss << s;
     return ss.str();
+}
+
+template <>
+inline std::string widen<>(char const *s)
+{
+    return s;
+}
+
+template <class T>
+inline std::shared_ptr<T> copy_shared(T const &t)
+{
+    return std::make_shared<T>(t);
 }
 
 } // namespace detail
@@ -163,16 +184,6 @@ private:
 using error = basic_error<std::string>;
 using werror = basic_error<std::wstring>;
 
-namespace detail {
-
-template <class String>
-[[noreturn]] void throw_error(char const *message)
-{
-    throw basic_error<String>(widen<String>(message));
-}
-
-} // namespace detail
-
 template <class String, class T, class = void>
 struct default_read
 {
@@ -181,14 +192,8 @@ struct default_read
         T t;
         detail::sstream<String> ss(s);
         ss >> t;
-        return ss && (ss.peek(), ss.eof()) ? std::make_shared<T>(t) : nullptr;
+        return ss && (ss.peek(), ss.eof()) ? detail::copy_shared(t) : nullptr;
     }
-};
-
-template <class String>
-struct default_read<String, void>
-{
-    std::shared_ptr<void> operator()(String const &) const { return nullptr; }
 };
 
 template <class String>
@@ -196,7 +201,7 @@ struct default_read<String, String>
 {
     std::shared_ptr<String> operator()(String const &s) const
     {
-        return std::make_shared<String>(s);
+        return detail::copy_shared(s);
     }
 };
 
@@ -237,7 +242,8 @@ public:
     using subcommand_tuple_type = Subcommands;
     using argument_tuple_type = Arguments;
 
-    basic_command(String const &header, String const &footer) : m_header(header), m_footer(footer)
+    basic_command(String const &header, String const &footer = String()) :
+        m_header(header), m_footer(footer)
     {}
 
     basic_command(
@@ -250,10 +256,10 @@ public:
     template <OptionType Option>
     auto flag(
         std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
-        String const &help) const
+        String const &help, bool is_help_or_version = false) const
     {
         detail::flag<String, OptionType, Option, void> f {
-            short_names, long_names, {}, help, {}, default_read<String, void>() };
+            short_names, long_names, {}, help, {}, {}, is_help_or_version };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -373,7 +379,8 @@ class option_map : private Pairs...
 {
 private:
     template <class Iterator, class Command>
-    friend typename detail::to_option_map<Command>::type parse(Iterator, Iterator, Command const &);
+    friend typename detail::to_option_map<Command>::type
+    parse(Iterator, Iterator, Command const &);
 
     template <OptionType Option, class Value>
     static auto &priv_value_impl(detail::option_pair<OptionType, Option, Value> &p)
@@ -388,15 +395,15 @@ private:
     }
     
     template <OptionType Option>
-    auto const &priv_value() const { return priv_value_impl<Option>(*this); }
+    auto &priv_value() { return priv_value_impl<Option>(*this); }
 
     template <OptionType Option>
-    auto &priv_value() { return priv_value_impl<Option>(*this); }
+    auto const &priv_value() const { return priv_value_impl<Option>(*this); }
     
 public:
     template <OptionType Option>
     using type = typename std::remove_reference_t<
-        decltype(priv_value_impl<Option>(std::declval<option_map const &>()))>::element_type;
+        decltype(priv_value_impl<Option>(std::declval<option_map &>()))>::element_type;
     
     template <OptionType Option>
     bool has() const { return static_cast<bool>(priv_value<Option>()); }
@@ -433,7 +440,8 @@ struct to_option_pair<argument<String, OptionType, Option, Value>>
 
 template <class String, class OptionType, class ...Flags, class ...Subcommands, class ...Arguments>
 struct to_option_map<basic_command<
-    String, OptionType, std::tuple<Flags...>, std::tuple<Subcommands...>, std::tuple<Arguments...>>>
+    String, OptionType,
+    std::tuple<Flags...>, std::tuple<Subcommands...>, std::tuple<Arguments...>>>
 {
     using type = option_map<
         OptionType, typename to_option_pair<Flags>::type...,
@@ -491,7 +499,7 @@ struct parse_flag_long
 };
 
 template <class String>
-struct parse_flag_long<String, void, void>
+struct parse_flag_long<String, void>
 {
     template <class Iterator, class Flag>
     void operator()(
@@ -515,22 +523,21 @@ struct parse_flag_long<String, Value, std::enable_if_t<is_optional<Value>::value
         std::shared_ptr<Value> &value, Flag const &flg, String &err) const
     {
         if (!match[2].matched) {
-            value = std::make_shared<Value>();
+            value = copy_shared(optional_traits<Value>::construct());
         } else {
             auto const v = flg.read(match.str(2));
             if (!v) {
                 err = widen<String>("invalid argument: ") + match.str(0);
                 return;
             }
-            value = std::make_shared<Value>(optional_traits<Value>::make_optional(*v));
+            value = copy_shared(optional_traits<Value>::construct(*v));
         }
     }
 };
 
 template <class String, class Value>
 struct parse_flag_long<
-    String, Value,
-    std::enable_if_t<!std::is_same<String, Value>::value && is_container<Value>::value>>
+    String, Value, std::enable_if_t<is_container_but_string<String, Value>::value>>
 {
     template <class Iterator, class Flag>
     void operator()(
@@ -538,12 +545,12 @@ struct parse_flag_long<
         Iterator &arg_it, Iterator arg_last,
         std::shared_ptr<Value> &value, Flag const &flg, String &err) const
     {
-        std::shared_ptr<typename Value::value_type> v;
-        parse_flag_long<String, typename Value::value_type>()(
+        std::shared_ptr<typename container_traits<Value>::value_type> v;
+        parse_flag_long<String, typename container_traits<Value>::value_type>()(
             match, arg_it, arg_last, v, flg, err);
         if (!err.empty()) return;
-        if (!value) value = std::make_shared<Value>();
-        value->push_back(std::move(*v));
+        if (!value) value = copy_shared(container_traits<Value>::construct());
+        container_traits<Value>::push_back(*value, *v);
     }
 };
 
@@ -599,7 +606,7 @@ struct parse_flag_short<String, Value, std::enable_if_t<is_optional<Value>::valu
     {
         auto const name = *it;
         if (std::next(it) == last) {
-            value = std::make_shared<Value>();
+            value = copy_shared(optional_traits<Value>::construct());
         } else {
             auto const s = String(std::next(it), last);
             it = std::prev(last);
@@ -608,27 +615,26 @@ struct parse_flag_short<String, Value, std::enable_if_t<is_optional<Value>::valu
                 err = widen<String>("invalid argument: -") + name + widen<String>(" ") + s;
                 return;
             }
-            value = std::make_shared<Value>(optional_traits<Value>::make_optional(*v));
+            value = copy_shared(optional_traits<Value>::construct(*v));
         }
     }
 };
 
 template <class String, class Value>
 struct parse_flag_short<
-    String, Value,
-    std::enable_if_t<!std::is_same<String, Value>::value && is_container<Value>::value>>
+    String, Value, std::enable_if_t<is_container_but_string<String, Value>::value>>
 {
     template <class NameIt, class ArgIt, class Flag>
     void operator()(
         NameIt &it, NameIt last, ArgIt &arg_it, ArgIt arg_last,
         std::shared_ptr<Value> &value, Flag const &flg, String &err) const
     {
-        std::shared_ptr<typename Value::value_type> v;
-        parse_flag_short<String, typename Value::value_type>()(
+        std::shared_ptr<typename container_traits<Value>::value_type> v;
+        parse_flag_short<String, typename container_traits<Value>::value_type>()(
             it, last, arg_it, arg_last, v, flg, err);
         if (!err.empty()) return;
-        if (!value) value = std::make_shared<Value>();
-        value->push_back(std::move(*v));
+        if (!value) value = copy_shared(container_traits<Value>::construct());
+        container_traits<Value>::push_back(*value, *v);
     }
 };
 
@@ -663,7 +669,7 @@ struct parse_argument<String, Value, std::enable_if_t<is_optional<Value>::value>
         String &err) const
     {
         if (it == last) {
-            value = std::make_shared<Value>();
+            value = copy_shared(optional_traits<Value>::construct());
         } else {
             auto const v = arg.read(*it);
             if (!v) {
@@ -672,30 +678,39 @@ struct parse_argument<String, Value, std::enable_if_t<is_optional<Value>::value>
                 return;
             }
             ++it;
-            value = std::make_shared<Value>(optional_traits<Value>::make_optional(*v));
+            value = copy_shared(optional_traits<Value>::construct(*v));
         }
     }
 };
 
 template <class String, class Value>
 struct parse_argument<
-    String, Value,
-    std::enable_if_t<!std::is_same<String, Value>::value && is_container<Value>::value>>
+    String, Value, std::enable_if_t<is_container_but_string<String, Value>::value>>
 {
     template <class Iterator, class Argument>
     void operator()(
         Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg,
         String &err) const
     {
-        value = std::make_shared<Value>();
+        value = copy_shared(container_traits<Value>::construct());
         while (it != last) {
-            std::shared_ptr<typename Value::value_type> v;
-            parse_argument<String, typename Value::value_type>()(it, last, v, arg, err);
+            std::shared_ptr<typename container_traits<Value>::value_type> v;
+            parse_argument<String, typename container_traits<Value>::value_type>()(
+                it, last, v, arg, err);
             if (!err.empty()) return;
-            value->push_back(std::move(*v));
+            container_traits<Value>::push_back(*value, *v);
         }
     }
 };
+
+template <class T>
+using remove_cvr_t = std::remove_cv_t<std::remove_reference_t<T>>;
+
+template <class String>
+inline bool starts_with(String const &s1, String const &s2)
+{
+    return s1.size() >= s2.size() && std::equal(s2.begin(), s2.end(), s1.begin());
+}
 
 } // namespace detail
 
@@ -706,16 +721,17 @@ inline typename detail::to_option_map<Command>::type parse(
     using string_type = typename Command::string_type;
     using error_type = basic_error<string_type>;
     using regex_type = std::basic_regex<typename string_type::value_type>;
-    auto const _ = &detail::widen<string_type>;
+    auto const &_ = detail::widen<string_type>;
 
     typename detail::to_option_map<Command>::type opts;
     detail::tuple_for_each(command.m_flags, [&](auto const &flg)
         {
-            constexpr auto option = std::remove_reference_t<decltype(flg)>::option();
+            constexpr auto option = detail::remove_cvr_t<decltype(flg)>::option();
             opts.template priv_value<option>() = flg.default_value;
         });
 
     auto arg_it = arg_first;
+    bool has_help_or_version = false;
     for (; arg_it != arg_last; ++arg_it) {
         auto const cur = *arg_it;
         if (cur == _("--")) {
@@ -726,47 +742,43 @@ inline typename detail::to_option_map<Command>::type parse(
         if (std::regex_match(cur, match, regex_type(_("--([^=]+)(?:=(.*))?")))) {
             // long flag
             auto const name = match.str(1);
-            std::vector<string_type> exact_matches, partial_matches;
+            bool exact = false;
+            std::vector<string_type> partial_matches;
             detail::tuple_for_each(command.m_flags, [&](auto const &flg)
                 {
                     for (auto const &long_name : flg.long_names) {
                         if (name == long_name) {
-                            exact_matches.push_back(long_name);
-                        }
-                        else if (
-                            name.size() < long_name.size() &&
-                            std::equal(name.begin(), name.end(), long_name.begin())) {
+                            if (std::exchange(exact, true)) {
+                                throw error_type(
+                                    command.m_header + _(": ambiguous option: --") + name);
+                            }
+                        } else if (detail::starts_with(long_name, name)) {
                             partial_matches.push_back(long_name);
                         }
                     }
                 });
-            if (exact_matches.empty()) {
+            if (!exact) {
                 if (partial_matches.empty()) {
                     throw error_type(command.m_header + _(": unrecognized option: --") + name);
                 } else if (partial_matches.size() >= 2) {
                     detail::sstream<string_type> ss;
                     ss << command.m_header << ": ambiguous option: --" << name << " [";
                     bool first = true;
-                    for (auto const &pm : partial_matches) {
+                    for (auto const &long_name : partial_matches) {
                         if (!std::exchange(first, false)) ss << ", ";
-                        ss << "--" << pm;
+                        ss << "--" << long_name;
                     }
                     ss << "]";
                     throw error_type(ss.str());
                 }
-            } else if (exact_matches.size() >= 2) {
-                throw error_type(command.m_header + _(": ambiguous option: --") + name);
             }
             detail::tuple_for_each(command.m_flags, [&](auto const &flg)
                 {
-                    using flag_type = std::remove_cv_t<std::remove_reference_t<decltype(flg)>>;
+                    using flag_type = detail::remove_cvr_t<decltype(flg)>;
                     using value_type = typename flag_type::value_type;
                     constexpr auto option = flag_type::option();
                     for (auto const &long_name : flg.long_names) {
-                        if (exact_matches.empty() ?
-                                name.size() < long_name.size() &&
-                                std::equal(name.begin(), name.end(), long_name.begin()) :
-                                name == long_name) {
+                        if (exact ? name == long_name : detail::starts_with(long_name, name)) {
                             string_type err;
                             detail::parse_flag_long<string_type, value_type>()(
                                 match, arg_it, arg_last,
@@ -774,6 +786,7 @@ inline typename detail::to_option_map<Command>::type parse(
                             if (!err.empty()) {
                                 throw error_type(command.m_header + _(": ") + err);
                             }
+                            if (flg.is_help_or_version) has_help_or_version = true;
                         }
                     }
                 });
@@ -781,23 +794,24 @@ inline typename detail::to_option_map<Command>::type parse(
             // short flag
             for (auto it = match[1].first; it != match[1].second; ++it) {
                 auto const name = *it;
-                std::vector<typename string_type::value_type> matches;
+                bool exact = false;
                 detail::tuple_for_each(command.m_flags, [&](auto const &flg)
                     {
                         for (auto short_name : flg.short_names) {
                             if (name == short_name) {
-                                matches.push_back(short_name);
+                                if (std::exchange(exact, true)) {
+                                    throw error_type(
+                                        command.m_header + _(": ambiguous option: -") + name);
+                                }
                             }
                         }
                     });
-                if (matches.empty()) {
+                if (!exact) {
                     throw error_type(command.m_header + _(": unrecognized option: -") + name);
-                } else if (matches.size() >= 2) {
-                    throw error_type(command.m_header + _(": ambiguous option: -") + name);
                 }
                 detail::tuple_for_each(command.m_flags, [&](auto const &flg)
                     {
-                        using flag_type = std::remove_cv_t<std::remove_reference_t<decltype(flg)>>;
+                        using flag_type = detail::remove_cvr_t<decltype(flg)>;
                         using value_type = typename flag_type::value_type;
                         constexpr auto option = flag_type::option();
                         if (std::find(flg.short_names.begin(), flg.short_names.end(), name) !=
@@ -809,6 +823,7 @@ inline typename detail::to_option_map<Command>::type parse(
                             if (!err.empty()) {
                                 throw error_type(command.m_header + _(": ") + err);
                             }
+                            if (flg.is_help_or_version) has_help_or_version = true;
                         }
                     });
             }
@@ -818,19 +833,21 @@ inline typename detail::to_option_map<Command>::type parse(
         }
     }
 
-    if (std::tuple_size<typename Command::subcommand_tuple_type>::value != 0 &&
-        arg_it != arg_last) {
-        bool given = false;
+    if (has_help_or_version) return opts;
+
+    if (std::tuple_size<typename Command::subcommand_tuple_type>::value != 0) {
+        if (arg_it == arg_last) throw error_type(command.m_header + _(": subcommand required"));
+        bool exact = false;
         detail::tuple_for_each(command.m_subcommands, [&](auto const &subcmd)
             {
                 if (subcmd.name == *arg_it) {
-                    if (std::exchange(given, true)) {
+                    if (std::exchange(exact, true)) {
                         throw error_type(
                             command.m_header + _(": ambiguous subcommand: ") + *arg_it);
                     }
                 }
             });
-        if (!given) {
+        if (!exact) {
             throw error_type(command.m_header + _(": unrecognized subcommand: ") + *arg_it);
         }
         detail::tuple_for_each(command.m_subcommands, [&](auto const &subcmd)
@@ -840,9 +857,8 @@ inline typename detail::to_option_map<Command>::type parse(
                         std::remove_reference_t<decltype(subcmd)>>;
                     constexpr auto option = subcommand_type::option();
                     ++arg_it;
-                    opts.template priv_value<option>() =
-                        std::make_shared<typename decltype(opts)::template type<option>>(
-                            parse(arg_it, arg_last, subcmd.command));
+                    opts.template priv_value<option>() = detail::copy_shared(
+                        parse(arg_it, arg_last, subcmd.command));
                 }
             });
         return opts;
@@ -871,7 +887,8 @@ inline typename detail::to_option_map<Command>::type parse(
 template <class Char, class Command>
 inline auto parse(int argc, Char * const *argv, Command const &command)
 {
-    return parse(argv + 1, argv + argc, command);
+    std::vector<typename Command::string_type> args(argv + 1, argv + argc);
+    return parse(args.begin(), args.end(), command);
 }
 
 namespace detail {
@@ -905,7 +922,7 @@ inline typename Command::string_type usage(Command const &command)
 {
     using string_type = typename Command::string_type;
     detail::sstream<string_type> ss;
-    auto const _ = &detail::widen<string_type>;
+    auto const &_ = detail::widen<string_type>;
 
     // Usage
     ss << "Usage: " << command.m_header;
@@ -917,11 +934,10 @@ inline typename Command::string_type usage(Command const &command)
     }
     detail::tuple_for_each(command.m_arguments, [&](auto const &arg)
         {
-            using value_type = typename std::remove_reference_t<decltype(arg)>::value_type;
-            if (is_optional<value_type>::value) {
+            using value_type = typename detail::remove_cvr_t<decltype(arg)>::value_type;
+            if (detail::is_optional<value_type>::value) {
                 ss << " [" << arg.placeholder << "]";
-            } else if (
-                !std::is_same<value_type, string_type>::value && is_container<value_type>::value) {
+            } else if (detail::is_container_but_string<string_type, value_type>::value) {
                 ss << " [" << arg.placeholder << "...]";
             } else {
                 ss << " " << arg.placeholder;
@@ -939,12 +955,12 @@ inline typename Command::string_type usage(Command const &command)
         typename string_type::size_type c0_max = 0, c1_max = 0;
         detail::tuple_for_each(command.m_flags, [&](auto const &flg)
             {
-                using value_type = typename std::remove_reference_t<decltype(flg)>::value_type;
+                using value_type = typename detail::remove_cvr_t<decltype(flg)>::value_type;
                 auto const short_ = detail::join_map(flg.short_names, _(", "), [&](auto const c)
                     {
                         if (std::is_void<value_type>::value) {
                             return _("-") + c;
-                        } else if (is_optional<value_type>::value) {
+                        } else if (detail::is_optional<value_type>::value) {
                             return _("-") + c + _("[") + flg.placeholder + _("]");
                         } else {
                             return _("-") + c + _(" ") + flg.placeholder;
@@ -954,7 +970,7 @@ inline typename Command::string_type usage(Command const &command)
                     {
                         if (std::is_void<value_type>::value) {
                             return _("--") + s;
-                        } else if (is_optional<value_type>::value) {
+                        } else if (detail::is_optional<value_type>::value) {
                             return _("--") + s + _("[=") + flg.placeholder + _("]");
                         } else {
                             return _("--") + s + _("=") + flg.placeholder;
@@ -1003,6 +1019,17 @@ inline typename Command::string_type usage(Command const &command)
     }
 
     return ss.str();
+}
+
+template <class T, class F>
+inline auto predicate(F &&f)
+{
+    return [f = std::forward<F>(f)](auto const &s) -> std::shared_ptr<T>
+        {
+            using string_type = detail::remove_cvr_t<decltype(s)>;
+            auto const v = default_read<string_type, T>()(s);
+            return v && f(*v) ? v : nullptr;
+        };
 }
 
 } // namespace nonsugar

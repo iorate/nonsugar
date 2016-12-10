@@ -20,38 +20,42 @@ int main(int argc, char **argv)
     enum class ConnectOption { Help, Host, Port };
 
     auto const greetCmd = command<GreetOption>("subcmd greet", "Greeting command")
-        .flag<GreetOption::Help>({'?'}, {"help"}, "display this help and exit")
+        .flag<GreetOption::Help>({'?'}, {"help"}, "display this help and exit", true)
         .flag<GreetOption::Message, std::string>({'g'}, {"greet"}, "STRING", "greeting message", "Hello")
         .flag<GreetOption::Decorate>({}, {"decorate"}, "decorate message")
         .argument<GreetOption::Name, std::string>("NAME")
         ;
     auto const connectCmd = command<ConnectOption>("subcmd connect", "Connect command")
-        .flag<ConnectOption::Help>({'?'}, {"help"}, "display this help and exit")
+        .flag<ConnectOption::Help>({'?'}, {"help"}, "display this help and exit", true)
         .flag<ConnectOption::Host, std::string>({'h'}, {"host"}, "HOST", "host name", "localhost")
         .flag<ConnectOption::Port, int>({'p'}, {"port"}, "PORT", "port number", 8080)
         ;
     auto const cmd = command<Option>("subcmd", "Test program for sub commands")
-        .flag<Option::Help>({'?'}, {"help"}, "display this help and exit")
+        .flag<Option::Help>({'?'}, {"help"}, "display this help and exit", true)
         .subcommand<Option::Greet>("greet", "Greeting command", greetCmd)
         .subcommand<Option::Connect>("connect", "Connect command", connectCmd)
         ;
 
-    auto const opts = parse(argc, argv, cmd);
-    if (opts.has<Option::Help>()) {
-        std::cout << usage(cmd) << std::endl;
-    } else if (auto const greetOpts = opts.get_shared<Option::Greet>()) {
-        if (greetOpts->has<GreetOption::Help>()) {
-            std::cout << usage(greetCmd) << std::endl;
-        } else {
-            auto const x = greetOpts->get<GreetOption::Message>() + ", " + greetOpts->get<GreetOption::Name>();
-            std::cout << (greetOpts->has<GreetOption::Decorate>() ? "***" + x + "***" : x) << std::endl;
+    try {
+        auto const opts = parse(argc, argv, cmd);
+        if (opts.has<Option::Help>()) {
+            std::cout << usage(cmd) << std::endl;
+        } else if (auto const greetOpts = opts.get_shared<Option::Greet>()) {
+            if (greetOpts->has<GreetOption::Help>()) {
+                std::cout << usage(greetCmd) << std::endl;
+            } else {
+                auto const x = greetOpts->get<GreetOption::Message>() + ", " + greetOpts->get<GreetOption::Name>();
+                std::cout << (greetOpts->has<GreetOption::Decorate>() ? "*** " + x + " ***" : x) << std::endl;
+            }
+        } else if (auto const connectOpts = opts.get_shared<Option::Connect>()) {
+            if (connectOpts->has<ConnectOption::Help>()) {
+                std::cout << usage(connectCmd) << std::endl;
+            } else {
+                auto const addr = connectOpts->get<ConnectOption::Host>() + ":" + std::to_string(connectOpts->get<ConnectOption::Port>());
+                std::cout << "connect to " << addr << std::endl;
+            }
         }
-    } else if (auto const connectOpts = opts.get_shared<Option::Connect>()) {
-        if (connectOpts->has<ConnectOption::Help>()) {
-            std::cout << usage(connectCmd) << std::endl;
-        } else {
-            auto const addr = connectOpts->get<ConnectOption::Host>() + ":" + std::to_string(connectOpts->get<ConnectOption::Port>());
-            std::cout << "connect to " << addr << std::endl;
-        }
+    } catch (error const &e) {
+        std::cerr << e.message() << std::endl;
     }
 }
