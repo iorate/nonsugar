@@ -594,7 +594,7 @@ struct parse_flag_short<String, Value, std::enable_if_t<is_optional<Value>::valu
 {
     template <class NameIt, class ArgIt, class Flag>
     void operator()(
-        NameIt &it, NameIt last, ArgIt &arg_it, ArgIt arg_last,
+        NameIt &it, NameIt last, ArgIt &, ArgIt,
         std::shared_ptr<Value> &value, Flag const &flg, String &err) const
     {
         auto const name = *it;
@@ -627,7 +627,7 @@ struct parse_flag_short<
         parse_flag_short<String, typename Value::value_type>()(
             it, last, arg_it, arg_last, v, flg, err);
         if (!err.empty()) return;
-        value = std::make_shared<Value>();
+        if (!value) value = std::make_shared<Value>();
         value->push_back(std::move(*v));
     }
 };
@@ -646,7 +646,7 @@ struct parse_argument
         }
         auto const v = arg.read(*it);
         if (!v) {
-            err = widen<String>("bad argument: ") + arg.placeholder + widen<String>("=") + *it;
+            err = widen<String>("invalid argument: ") + arg.placeholder + widen<String>("=") + *it;
             return;
         }
         ++it;
@@ -667,7 +667,8 @@ struct parse_argument<String, Value, std::enable_if_t<is_optional<Value>::value>
         } else {
             auto const v = arg.read(*it);
             if (!v) {
-                err = widen<String>("bad argument: ") + arg.placeholder + widen<String>("=") + *it;
+                err = widen<String>("invalid argument: ") + arg.placeholder +
+                    widen<String>("=") + *it;
                 return;
             }
             ++it;
@@ -733,7 +734,7 @@ inline typename detail::to_option_map<Command>::type parse(
                             exact_matches.push_back(long_name);
                         }
                         else if (
-                            name.size() <= long_name.size() &&
+                            name.size() < long_name.size() &&
                             std::equal(name.begin(), name.end(), long_name.begin())) {
                             partial_matches.push_back(long_name);
                         }
@@ -762,8 +763,10 @@ inline typename detail::to_option_map<Command>::type parse(
                     using value_type = typename flag_type::value_type;
                     constexpr auto option = flag_type::option();
                     for (auto const &long_name : flg.long_names) {
-                        if (name.size() <= long_name.size() &&
-                            std::equal(name.begin(), name.end(), long_name.begin())) {
+                        if (exact_matches.empty() ?
+                                name.size() < long_name.size() &&
+                                std::equal(name.begin(), name.end(), long_name.begin()) :
+                                name == long_name) {
                             string_type err;
                             detail::parse_flag_long<string_type, value_type>()(
                                 match, arg_it, arg_last,

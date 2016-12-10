@@ -62,17 +62,17 @@ BOOST_AUTO_TEST_CASE(argument_failure1)
             std::vector<std::string> args = { "iorate", "foo" };
             parse(args.begin(), args.end(), cmd);
         } catch (error const &e) {
-            BOOST_TEST(e.message() == "foobar: bad argument: A_INT=foo");
+            BOOST_TEST(e.message() == "foobar: invalid argument: A_INT=foo");
             try {
                 std::vector<std::string> args = { "iorate", "12", "bar" };
                 parse(args.begin() , args.end(), cmd);
             } catch (error const &e) {
-                BOOST_TEST(e.message() == "foobar: bad argument: B_INT=bar");
+                BOOST_TEST(e.message() == "foobar: invalid argument: B_INT=bar");
                 try {
                     std::vector<std::string> args = { "iorate", "12", "23", "34", "baz" };
                     parse(args.begin(), args.end(), cmd);
                 } catch (error const &e) {
-                    BOOST_TEST(e.message() == "foobar: bad argument: C_INT=baz");
+                    BOOST_TEST(e.message() == "foobar: invalid argument: C_INT=baz");
                     return;
                 }
             }
