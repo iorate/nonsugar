@@ -24,7 +24,10 @@ $(PROGRAM): $(OBJS)
 .cpp.o:
 	$(CXX) $(CXXFLAGS) -c $<
 
+run: $(PROGRAM)
+	./$(PROGRAM)
+
 clean:
 	rm -rf $(PROGRAM) $(OBJS)
 
-$(OBJS): ../include/nonsugar.hpp
+$(filter-out main.o,$(OBJS)): ../include/nonsugar.hpp

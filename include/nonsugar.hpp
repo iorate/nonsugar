@@ -46,7 +46,6 @@ template <class T>
 struct optional_traits<std::shared_ptr<T>>
 {
     using value_type = T;
-    static std::shared_ptr<T> construct() { return {}; }
     static std::shared_ptr<T> construct(T const &v) { return std::make_shared<T>(v); }
 };
 
@@ -54,7 +53,6 @@ template <class T>
 struct optional_traits<boost::optional<T>>
 {
     using value_type = T;
-    static boost::optional<T> construct() { return {}; }
     static boost::optional<T> construct(T const &v) { return v; }
 };
 
@@ -66,7 +64,6 @@ struct container_traits<T, detail::void_t<
     typename T::value_type, typename T::iterator, typename T::size_type, typename T::reference>>
 {
     using value_type = typename T::value_type;
-    static T construct() { return {}; }
     static void push_back(T &t, value_type const &v) { t.push_back(v); }
 };
 
@@ -183,16 +180,20 @@ private:
 
 using error = basic_error<std::string>;
 using werror = basic_error<std::wstring>;
+using u16error = basic_error<std::u16string>;
+using u32error = basic_error<std::u32string>;
 
 template <class String, class T, class = void>
 struct default_read
 {
     std::shared_ptr<T> operator()(String const &s) const
     {
+        using sstream_t = detail::sstream<String>;
+        sstream_t ss(s);
         T t;
-        detail::sstream<String> ss(s);
         ss >> t;
-        return ss && (ss.peek(), ss.eof()) ? detail::copy_shared(t) : nullptr;
+        return ss && ss.peek() == sstream_t::traits_type::eof() ?
+            detail::copy_shared(t) : nullptr;
     }
 };
 
@@ -357,6 +358,8 @@ public:
 
 template <class OptionType> using command = basic_command<std::string, OptionType>;
 template <class OptionType> using wcommand = basic_command<std::wstring, OptionType>;
+template <class OptionType> using u16command = basic_command<std::u16string, OptionType>;
+template <class OptionType> using u32command = basic_command<std::u32string, OptionType>;
 
 namespace detail {
 
@@ -523,7 +526,7 @@ struct parse_flag_long<String, Value, std::enable_if_t<is_optional<Value>::value
         std::shared_ptr<Value> &value, Flag const &flg, String &err) const
     {
         if (!match[2].matched) {
-            value = copy_shared(optional_traits<Value>::construct());
+            value = std::make_shared<Value>();
         } else {
             auto const v = flg.read(match.str(2));
             if (!v) {
@@ -549,7 +552,7 @@ struct parse_flag_long<
         parse_flag_long<String, typename container_traits<Value>::value_type>()(
             match, arg_it, arg_last, v, flg, err);
         if (!err.empty()) return;
-        if (!value) value = copy_shared(container_traits<Value>::construct());
+        if (!value) value = std::make_shared<Value>();
         container_traits<Value>::push_back(*value, *v);
     }
 };
@@ -585,7 +588,7 @@ struct parse_flag_short
 };
 
 template <class String>
-struct parse_flag_short<String, void, void>
+struct parse_flag_short<String, void>
 {
     template <class NameIt, class ArgIt, class Flag>
     void operator()(
@@ -606,7 +609,7 @@ struct parse_flag_short<String, Value, std::enable_if_t<is_optional<Value>::valu
     {
         auto const name = *it;
         if (std::next(it) == last) {
-            value = copy_shared(optional_traits<Value>::construct());
+            value = std::make_shared<Value>();
         } else {
             auto const s = String(std::next(it), last);
             it = std::prev(last);
@@ -633,7 +636,7 @@ struct parse_flag_short<
         parse_flag_short<String, typename container_traits<Value>::value_type>()(
             it, last, arg_it, arg_last, v, flg, err);
         if (!err.empty()) return;
-        if (!value) value = copy_shared(container_traits<Value>::construct());
+        if (!value) value = std::make_shared<Value>();
         container_traits<Value>::push_back(*value, *v);
     }
 };
@@ -669,7 +672,7 @@ struct parse_argument<String, Value, std::enable_if_t<is_optional<Value>::value>
         String &err) const
     {
         if (it == last) {
-            value = copy_shared(optional_traits<Value>::construct());
+            value = std::make_shared<Value>();
         } else {
             auto const v = arg.read(*it);
             if (!v) {
@@ -692,7 +695,7 @@ struct parse_argument<
         Iterator &it, Iterator last, std::shared_ptr<Value> &value, Argument const &arg,
         String &err) const
     {
-        value = copy_shared(container_traits<Value>::construct());
+        value = std::make_shared<Value>();
         while (it != last) {
             std::shared_ptr<typename container_traits<Value>::value_type> v;
             parse_argument<String, typename container_traits<Value>::value_type>()(
@@ -710,6 +713,12 @@ template <class String>
 inline bool starts_with(String const &s1, String const &s2)
 {
     return s1.size() >= s2.size() && std::equal(s2.begin(), s2.end(), s1.begin());
+}
+
+template <class Container>
+inline bool contains(Container const &c, typename Container::value_type v)
+{
+    return std::find(c.begin(), c.end(), v) != c.end();
 }
 
 } // namespace detail
@@ -731,7 +740,7 @@ inline typename detail::to_option_map<Command>::type parse(
         });
 
     auto arg_it = arg_first;
-    bool has_help_or_version = false;
+    bool is_help_or_version = false;
     for (; arg_it != arg_last; ++arg_it) {
         auto const cur = *arg_it;
         if (cur == _("--")) {
@@ -786,7 +795,7 @@ inline typename detail::to_option_map<Command>::type parse(
                             if (!err.empty()) {
                                 throw error_type(command.m_header + _(": ") + err);
                             }
-                            if (flg.is_help_or_version) has_help_or_version = true;
+                            if (flg.is_help_or_version) is_help_or_version = true;
                         }
                     }
                 });
@@ -797,12 +806,10 @@ inline typename detail::to_option_map<Command>::type parse(
                 bool exact = false;
                 detail::tuple_for_each(command.m_flags, [&](auto const &flg)
                     {
-                        for (auto short_name : flg.short_names) {
-                            if (name == short_name) {
-                                if (std::exchange(exact, true)) {
-                                    throw error_type(
-                                        command.m_header + _(": ambiguous option: -") + name);
-                                }
+                        if (detail::contains(flg.short_names, name)) {
+                            if (std::exchange(exact, true)) {
+                                throw error_type(
+                                    command.m_header + _(": ambiguous option: -") + name);
                             }
                         }
                     });
@@ -814,8 +821,7 @@ inline typename detail::to_option_map<Command>::type parse(
                         using flag_type = detail::remove_cvr_t<decltype(flg)>;
                         using value_type = typename flag_type::value_type;
                         constexpr auto option = flag_type::option();
-                        if (std::find(flg.short_names.begin(), flg.short_names.end(), name) !=
-                            flg.short_names.end()) {
+                        if (detail::contains(flg.short_names, name)) {
                             string_type err;
                             detail::parse_flag_short<string_type, value_type>()(
                                 it, match[1].second, arg_it, arg_last,
@@ -823,7 +829,7 @@ inline typename detail::to_option_map<Command>::type parse(
                             if (!err.empty()) {
                                 throw error_type(command.m_header + _(": ") + err);
                             }
-                            if (flg.is_help_or_version) has_help_or_version = true;
+                            if (flg.is_help_or_version) is_help_or_version = true;
                         }
                     });
             }
@@ -833,7 +839,7 @@ inline typename detail::to_option_map<Command>::type parse(
         }
     }
 
-    if (has_help_or_version) return opts;
+    if (is_help_or_version) return opts;
 
     if (std::tuple_size<typename Command::subcommand_tuple_type>::value != 0) {
         if (arg_it == arg_last) throw error_type(command.m_header + _(": subcommand required"));
