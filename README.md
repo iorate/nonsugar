@@ -83,12 +83,12 @@ A compiler that supports C++14. `nonsugar` is tested under g++ 6.2.0 and clang++
 Just copy `nonsugar.hpp` to your include directory.
 
 ## Usage
-1. Include `nonsugar.hpp`.
+1\. Include `nonsugar.hpp`.
 ```cpp
 #include <nonsugar.hpp>
 using namespace nonsugar; // if you like
 ```
-2. Create a command.
+2\. Create a command.
 ```cpp
     // Create a command.
     auto const cmd = command<char>("compiler", "nonsugar example")
@@ -121,7 +121,7 @@ using namespace nonsugar; // if you like
          // The argument is the value placeholder used in usage.
         ;
 ```
-3. Parse the command line and get the option map.
+3\. Parse the command line and get the option map.
 ```cpp
 try {
     // Parse the command line and get the option map.
@@ -134,7 +134,7 @@ try {
     std::cerr << e.message() << "\n";
 }
 ```
-4. Read the parsed options.
+4\. Read the option map.
 ```cpp
 // Is the option specified?
 if (opts.has<'o'>()) {
