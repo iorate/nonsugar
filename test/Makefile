@@ -11,7 +11,7 @@ EXEEXT := .exe
 endif
 
 CXX := g++
-CXXFLAGS := -Wall -Wextra --pedantic-errors -I../include
+CXXFLAGS := -Wall -Wextra --pedantic-errors -I..
 LDFLAGS := -lboost_unit_test_framework-mt
 OBJS := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 PROGRAM := nonsugar_test$(EXEEXT)
@@ -30,4 +30,4 @@ run: $(PROGRAM)
 clean:
 	rm -rf $(PROGRAM) $(OBJS)
 
-$(filter-out main.o,$(OBJS)): ../include/nonsugar.hpp
+$(filter-out main.o,$(OBJS)): ../nonsugar.hpp
