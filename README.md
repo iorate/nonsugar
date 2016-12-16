@@ -134,7 +134,7 @@ catch (error const &e) {
  // basic_error<std::string>).
 
     // Get the error message.
-    std::cerr << e.message();
+    std::cerr << e.message() << "\n";
 }
 ```
 4. Read the parsed options.
@@ -223,7 +223,7 @@ try {
 
     // Read the subcommands.
     if (opts.has<'H'>()) {
-        // For subcommands, get() returns the option map of the subcommand.
+        // For a subcommand, get() returns the option map of the subcommand.
         auto const helloOpts = opts.get<'H'>();
         auto const name = helloOpts.get<'n'>();
         std::cout << "Hello, " << name << "!\n";

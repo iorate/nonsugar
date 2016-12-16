@@ -74,5 +74,5 @@ catch (error const &e) {
  // basic_error<std::string>).
 
     // Get the error message.
-    std::cerr << e.message();
+    std::cerr << e.message() << "\n";
 }
