@@ -13,8 +13,7 @@
 using namespace nonsugar;
 
 int main(int argc, char *argv[])
-try
-{
+try {
     auto const cmd = command<char>("compiler", "nonsugar example")
         .flag<'h'>({}, {"help"}, "produce help message")
         .flag<'v'>({'v'}, {"version"}, "print version string")

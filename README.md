@@ -15,8 +15,7 @@ This is a reimplementation of [Boost.Program\_options tutorial](http://www.boost
 using namespace nonsugar;
 
 int main(int argc, char *argv[])
-try
-{
+try {
     auto const cmd = command<char>("compiler", "nonsugar example")
         .flag<'h'>({}, {"help"}, "produce help message")
         .flag<'v'>({'v'}, {"version"}, "print version string")
@@ -124,12 +123,10 @@ using namespace nonsugar; // if you like
 ```
 3. Parse the command line and get the option map.
 ```cpp
-try
-{
+try {
     // Parse the command line and get the option map.
     auto const opts = parse(argc, argv, cmd);
-}
-catch (error const &e) {
+} catch (error const &e) {
  // When the parsing is failed, an object of basic_error<String> is thrown (error is the typedef of
  // basic_error<std::string>).
 

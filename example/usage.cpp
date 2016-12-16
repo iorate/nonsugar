@@ -68,8 +68,7 @@ try {
         std::cout << "optimization level: " << *n << "\n";
     }
 #endif
-}
-catch (error const &e) {
+} catch (error const &e) {
  // When the parsing is failed, an object of basic_error<String> is thrown (error is the typedef of
  // basic_error<std::string>).
 
