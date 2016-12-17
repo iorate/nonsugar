@@ -142,7 +142,8 @@ struct argument
 };
 
 template <class String>
-using sstream = std::basic_stringstream<typename String::value_type, typename String::traits_type>;
+using sstream = std::basic_stringstream<
+    typename String::value_type, typename String::traits_type, typename String::allocator_type>;
 
 template <class String>
 inline String widen(char const *s)
