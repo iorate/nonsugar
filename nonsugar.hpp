@@ -560,9 +560,9 @@ struct parse_flag_long<
 template <class String, class Value, class = void>
 struct parse_flag_short
 {
-    template <class NameIt, class ArgIt, class Flag>
+    template <class NameIterator, class Iterator, class Flag>
     void operator()(
-        NameIt &it, NameIt last, ArgIt &arg_it, ArgIt arg_last,
+        NameIterator &it, NameIterator last, Iterator &arg_it, Iterator arg_last,
         std::shared_ptr<Value> &value, Flag const &flg, String &err) const
     {
         auto const name = *it;
@@ -590,9 +590,9 @@ struct parse_flag_short
 template <class String>
 struct parse_flag_short<String, void>
 {
-    template <class NameIt, class ArgIt, class Flag>
+    template <class NameIterator, class Iterator, class Flag>
     void operator()(
-        NameIt &, NameIt, ArgIt &, ArgIt,
+        NameIterator &, NameIterator, Iterator &, Iterator,
         std::shared_ptr<void> &value, Flag const &, String &) const
     {
         value = std::make_shared<int>();
@@ -602,9 +602,9 @@ struct parse_flag_short<String, void>
 template <class String, class Value>
 struct parse_flag_short<String, Value, std::enable_if_t<is_optional<Value>::value>>
 {
-    template <class NameIt, class ArgIt, class Flag>
+    template <class NameIterator, class Iterator, class Flag>
     void operator()(
-        NameIt &it, NameIt last, ArgIt &, ArgIt,
+        NameIterator &it, NameIterator last, Iterator &, Iterator,
         std::shared_ptr<Value> &value, Flag const &flg, String &err) const
     {
         auto const name = *it;
@@ -627,9 +627,9 @@ template <class String, class Value>
 struct parse_flag_short<
     String, Value, std::enable_if_t<is_container_but_string<String, Value>::value>>
 {
-    template <class NameIt, class ArgIt, class Flag>
+    template <class NameIterator, class Iterator, class Flag>
     void operator()(
-        NameIt &it, NameIt last, ArgIt &arg_it, ArgIt arg_last,
+        NameIterator &it, NameIterator last, Iterator &arg_it, Iterator arg_last,
         std::shared_ptr<Value> &value, Flag const &flg, String &err) const
     {
         std::shared_ptr<typename container_traits<Value>::value_type> v;
@@ -725,7 +725,7 @@ inline bool contains(Container const &c, typename Container::value_type v)
 
 template <class Iterator, class Command>
 inline typename detail::to_option_map<Command>::type parse(
-    Iterator arg_first, Iterator arg_last, Command const &command)
+    Iterator begin, Iterator end, Command const &command)
 {
     using string_type = typename Command::string_type;
     using error_type = basic_error<string_type>;
@@ -739,16 +739,18 @@ inline typename detail::to_option_map<Command>::type parse(
             opts.template priv_value<option>() = flg.default_value;
         });
 
-    auto arg_it = arg_first;
+    std::vector<string_type> const args(begin, end);
+    auto arg_it = args.begin();
+    auto const arg_last = args.end();
     bool is_help_or_version = false;
+
     for (; arg_it != arg_last; ++arg_it) {
-        auto const cur = *arg_it;
-        if (cur == _("--")) {
+        if (*arg_it == _("--")) {
             ++arg_it;
             break;
         }
         std::match_results<typename string_type::const_iterator> match;
-        if (std::regex_match(cur, match, regex_type(_("--([^=]+)(?:=(.*))?")))) {
+        if (std::regex_match(*arg_it, match, regex_type(_("--([^=]+)(?:=(.*))?")))) {
             // long flag
             auto const name = match.str(1);
             bool exact = false;
@@ -799,7 +801,7 @@ inline typename detail::to_option_map<Command>::type parse(
                         }
                     }
                 });
-        } else if (std::regex_match(cur, match, regex_type(_("-(.+)")))) {
+        } else if (std::regex_match(*arg_it, match, regex_type(_("-(.+)")))) {
             // short flag
             for (auto it = match[1].first; it != match[1].second; ++it) {
                 auto const name = *it;
@@ -893,8 +895,7 @@ inline typename detail::to_option_map<Command>::type parse(
 template <class Char, class Command>
 inline auto parse(int argc, Char * const *argv, Command const &command)
 {
-    std::vector<typename Command::string_type> args(argv + 1, argv + argc);
-    return parse(args.begin(), args.end(), command);
+    return parse(argv + (argc > 0 ? 1 : 0), argv + argc, command);
 }
 
 namespace detail {
