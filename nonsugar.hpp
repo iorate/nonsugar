@@ -65,7 +65,7 @@ struct container_traits<T, detail::void_t<
     typename T::value_type, typename T::iterator, typename T::size_type, typename T::reference>>
 {
     using value_type = typename T::value_type;
-    static void push_back(T &t, value_type const &v) { t.push_back(v); }
+    static void push_back(T &t, value_type const &v) { t.insert(t.end(), v); }
 };
 
 namespace detail {
