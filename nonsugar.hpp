@@ -12,12 +12,13 @@
 #include <algorithm>
 #include <cstddef>
 #include <exception>
+#include <functional>
 #include <initializer_list>
 #include <iterator>
 #include <memory>
+#include <regex>
 #include <sstream>
 #include <string>
-#include <regex>
 #include <tuple>
 #include <type_traits>
 #include <utility>
