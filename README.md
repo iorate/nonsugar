@@ -49,7 +49,7 @@ try {
 }
 ```
 ``` shell
-$ g++ -I../include compiler.cpp -o compiler
+$ g++ -I.. compiler.cpp -o compiler
 
 $ ./compiler --help
 Usage: compiler [OPTION...] [INPUT-FILE...]
@@ -234,7 +234,7 @@ try {
 }
 ```
 ``` shell
-$ g++ subcmd.cpp -I../include -o subcmd
+$ g++ -I.. subcmd.cpp -o subcmd
 
 $ ./subcmd
 subcmd: command required
