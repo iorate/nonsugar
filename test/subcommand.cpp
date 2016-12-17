@@ -54,17 +54,17 @@ BOOST_AUTO_TEST_CASE(subcommand_failure1)
         std::vector<std::string> args = { "add" };
         parse(args.begin(), args.end(), cmd);
     } catch (error const &e) {
-        BOOST_TEST(e.message() == "calc: ambiguous subcommand: add");
+        BOOST_TEST(e.message() == "calc: ambiguous command: add");
         try {
             std::vector<std::string> args = { "sub" };
             parse(args.begin(), args.end(), cmd);
         } catch (error const &e) {
-            BOOST_TEST(e.message() == "calc: unrecognized subcommand: sub");
+            BOOST_TEST(e.message() == "calc: unrecognized command: sub");
             try {
                 std::vector<std::string> args = {};
                 parse(args.begin(), args.end(), cmd);
             } catch (error const &e) {
-                BOOST_TEST(e.message() == "calc: subcommand required");
+                BOOST_TEST(e.message() == "calc: command required");
                 return;
             }
         }

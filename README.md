@@ -237,10 +237,10 @@ try {
 $ g++ subcmd.cpp -I../include -o subcmd
 
 $ ./subcmd
-subcmd: subcommand required
+subcmd: command required
 
 $ ./subcmd --help
-Usage: subcmd [OPTION...] <COMMAND> [ARGS...]
+Usage: subcmd [OPTION...] COMMAND [ARG...]
 
 Options:
   -h  --help  produce help message

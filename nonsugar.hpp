@@ -842,19 +842,19 @@ inline typename detail::to_option_map<Command>::type parse(
     if (is_help_or_version) return opts;
 
     if (std::tuple_size<typename Command::subcommand_tuple_type>::value != 0) {
-        if (arg_it == arg_last) throw error_type(command.m_header + _(": subcommand required"));
+        if (arg_it == arg_last) throw error_type(command.m_header + _(": command required"));
         bool exact = false;
         detail::tuple_for_each(command.m_subcommands, [&](auto const &subcmd)
             {
                 if (subcmd.name == *arg_it) {
                     if (std::exchange(exact, true)) {
                         throw error_type(
-                            command.m_header + _(": ambiguous subcommand: ") + *arg_it);
+                            command.m_header + _(": ambiguous command: ") + *arg_it);
                     }
                 }
             });
         if (!exact) {
-            throw error_type(command.m_header + _(": unrecognized subcommand: ") + *arg_it);
+            throw error_type(command.m_header + _(": unrecognized command: ") + *arg_it);
         }
         detail::tuple_for_each(command.m_subcommands, [&](auto const &subcmd)
             {
@@ -936,7 +936,7 @@ inline typename Command::string_type usage(Command const &command)
         ss << " [OPTION...]";
     }
     if (std::tuple_size<typename Command::subcommand_tuple_type>::value > 0) {
-        ss << " <COMMAND> [ARGS...]";
+        ss << " COMMAND [ARG...]";
     }
     detail::tuple_for_each(command.m_arguments, [&](auto const &arg)
         {

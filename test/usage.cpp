@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(usage_subcommand)
         .subcommand<Option::C>("c", "", command<COption>("usage c", ""))
         ;
     BOOST_TEST(usage(cmd) ==
-R"(Usage: usage [OPTION...] <COMMAND> [ARGS...]
+R"(Usage: usage [OPTION...] COMMAND [ARG...]
   usage test
 
 Options:
