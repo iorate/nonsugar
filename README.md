@@ -156,6 +156,14 @@ if (auto const n = opts.get_shared<'o'>()) {
     std::cout << "optimization level: " << *n << "\n";
 }
 ```
+5\. Show the help message if necessary.
+```cpp
+if (opts.has<'h'>()) {
+    // Show the help message.
+    std::cout << usage(cmd);
+    return 0;
+}
+```
 
 ## Go Further
 

@@ -48,6 +48,12 @@ try {
     // Parse the command line and get the option map.
     auto const opts = parse(argc, argv, cmd);
 
+    if (opts.has<'h'>()) {
+        // Show the help message.
+        std::cout << usage(cmd);
+        return 0;
+    }
+
 #if 0
     // Is the option specified?
     if (opts.has<'o'>()) {
