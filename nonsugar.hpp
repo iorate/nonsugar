@@ -245,7 +245,7 @@ public:
     using subcommand_tuple_type = Subcommands;
     using argument_tuple_type = Arguments;
 
-    basic_command(String const &header, String const &footer = String()) :
+    explicit basic_command(String const &header, String const &footer = String()) :
         m_header(header), m_footer(footer)
     {}
 
