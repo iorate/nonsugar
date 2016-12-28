@@ -99,7 +99,7 @@ struct value_of<String, T, std::enable_if_t<is_optional<T>::value>>
 template <class String, class T>
 struct value_of<String, T, std::enable_if_t<is_container_but_string<String, T>::value>>
 {
-    using type = typename value_of<String, typename container_traits<T>::value_type>::type;
+    using type = typename container_traits<T>::value_type;
 };
 
 template <class String, class OptionType, OptionType Option, class Value>
