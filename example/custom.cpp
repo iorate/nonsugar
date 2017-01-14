@@ -1,7 +1,7 @@
 
 // nonsugar
 //
-// Copyright iorate 2016.
+// Copyright iorate 2016-2017.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -16,7 +16,7 @@ using namespace nonsugar;
 int main(int argc, char *argv[])
 try {
 #if 0
-    auto const cmd = command<char>("window")
+    auto const cmd = command<char>("custom")
     .flag<'t', int>({'t'}, {"transparency"}, "N", "Set the transparency (0-255)",
         [](std::string const &s) -> std::shared_ptr<int>
         {
@@ -29,7 +29,7 @@ try {
         })
     ;
 #else
-auto const cmd = command<char>("window")
+auto const cmd = command<char>("custom")
     .flag<'t', int>({'t'}, {"transparency"}, "N", "Set the transparency (0-255)",
         predicate<int>([](int n) { return 0 <= n && n <= 255; }))
     ;

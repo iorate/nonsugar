@@ -92,33 +92,33 @@ using namespace nonsugar; // if you like
 ```cpp
     // Create a command.
     auto const cmd = command<char>("compiler", "nonsugar example")
-     // Template argument is an integer or enumeration type that identifies options.
-     // 1st argument is the program name used in usage and error messages.
-     // 2nd argument is the program summary used in usage (default: "").
+     // Template parameter is an integer or enumeration type that identifies options.
+     // 1st parameter is the program name used in usage and error messages.
+     // 2nd parameter is the program summary used in usage (default: "").
 
         // Add a flag without value.
         .flag<'h'>({'h'}, {"help"}, "produce help message", true)
-         // The template argument is the option identifier.
-         // 1st argument is the list of short names.
-         // 2nd argument is the list of long names.
-         // 3rd argument is the flag summary used in usage.
-         // 4th argument is whether to skip parsing of subcommands and arguments (default: false).
+         // The template parameter is the option identifier.
+         // 1st parameter is the list of short names.
+         // 2nd parameter is the list of long names.
+         // 3rd parameter is the flag summary used in usage.
+         // 4th parameter is whether to skip parsing of subcommands and arguments (default: false).
          //  It is useful for --help and --version flag.
 
         // Add a flag with value.
         .flag<'o', int>({}, {"optimization","optimisation"}, "N", "optimization level", 10)
-         // 2nd template argument is the value type.
+         // 2nd template parameter is the value type.
          //  If an optional type (e.g. boost::optional<T>) is given, the value is optional.
          //  If a container type (e.g. std::vector<T>) is given, the flag can be specified multiple
          //  times.
-         // 3rd argument is the value placeholder used in usage.
-         // 5th argument is the default value (optional).
+         // 3rd parameter is the value placeholder used in usage.
+         // 5th parameter is the default value (optional).
 
         // Add an argument.
         .argument<'i', std::vector<std::string>>("INPUT-FILE")
-         // 1st template argument is the option identifier.
-         // 2nd template argument is the value type.
-         // The argument is the value placeholder used in usage.
+         // 1st template parameter is the option identifier.
+         // 2nd template parameter is the value type.
+         // The parameter is the value placeholder used in usage.
         ;
 ```
 3\. Parse the command line and get the option map.
@@ -138,12 +138,12 @@ try {
 ```cpp
 // Is the option specified?
 if (opts.has<'o'>()) {
- // The template argument is the option identifier.
+ // The template parameter is the option identifier.
  // For arguments, has() always returns true.
 
     // Get the option value.
     int const n = opts.get<'o'>();
-     // The template argument is the option identifier.
+     // The template parameter is the option identifier.
      // If the flag is not specified, get() leads to undefined behavior.
 
     std::cout << "optimization level: " << n << "\n";
@@ -204,18 +204,18 @@ try {
     
     // Create the main command.
     auto const cmd = command<char>("subcmd")
-        // Add a subcommand
+        // Add a subcommand.
         .subcommand<'H'>("hello", "hello command", helloCmd)
-         // The template argument is the option identifier.
-         // 1st argument is the subcommand name.
-         // 2nd argument is the subcommand summary used in usage.
-         // 3rd argument is the subcommand itself.
+         // The template parameter is the option identifier.
+         // 1st parameter is the subcommand name.
+         // 2nd parameter is the subcommand summary used in usage.
+         // 3rd parameter is the subcommand itself.
 
-        // Add a subcommand
+        // Add a subcommand.
         .subcommand<'A'>("add", "add command", addCmd)
 
         .flag<'h'>({'h'}, {"help"}, "produce help message", true)
-         // 4th argument indicates that the subcommands are ignored when this flag is specified.
+         // 4th parameter indicates that the subcommands are ignored when this flag is specified.
         ;
 
     // Parse the command line.
@@ -267,7 +267,7 @@ $ ./subcmd add 3 4
 ### Custom value reader
 By default, the flag value is translated by `std::basic_stringstream`. You can customize this behavior by giving a custom value reader to `flag()`.  A custom value reader shall be have a signature `std::shared_ptr<Value> (String const &)`. It shall return `nullptr` when an invalid value is passed.
 ```cpp
-auto const cmd = command<char>("window")
+auto const cmd = command<char>("custom")
     .flag<'t', int>({'t'}, {"transparency"}, "Set the transparency (0-255)",
         [](std::string const &s) -> std::shared_ptr<int>
         {
@@ -282,7 +282,7 @@ auto const cmd = command<char>("window")
 ```
 If you'd just like to validate the value, you can use `predicate()` helper function.
 ```cpp
-auto const cmd = command<char>("window")
+auto const cmd = command<char>("custom")
     .flag<'t', int>({'t'}, {"transparency"}, "Set the transparency (0-255)",
         predicate<int>([](int n) { return 0 <= n && n <= 255; }))
     ;

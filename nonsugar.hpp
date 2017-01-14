@@ -1,7 +1,7 @@
 
 // nonsugar
 //
-// Copyright iorate 2016.
+// Copyright iorate 2016-2017.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -29,7 +29,7 @@ namespace boost {
 template <class T>
 class optional;
 
-} // namespace boost;
+} // namespace boost
 
 namespace nonsugar {
 
@@ -115,7 +115,7 @@ struct flag
     String help;
     std::shared_ptr<Value> default_value;
     std::function<std::shared_ptr<typename value_of<String, Value>::type> (String const &)> read;
-    bool is_help_or_version = false;
+    bool is_help_or_version;
 };
 
 template <class String, class OptionType, OptionType Option, class Command>
@@ -275,7 +275,7 @@ public:
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, {},
-            default_read<String, typename detail::value_of<String, Value>::type>() };
+            default_read<String, typename detail::value_of<String, Value>::type>(), false };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -288,7 +288,7 @@ public:
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, std::make_shared<Value>(default_value),
-            default_read<String, typename detail::value_of<String, Value>::type>() };
+            default_read<String, typename detail::value_of<String, Value>::type>(), false };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -302,7 +302,7 @@ public:
         String const &placeholder, String const &help, Read &&read) const
     {
         detail::flag<String, OptionType, Option, Value> f {
-            short_names, long_names, placeholder, help, {}, std::forward<Read>(read) };
+            short_names, long_names, placeholder, help, {}, std::forward<Read>(read), false };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -316,7 +316,7 @@ public:
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, std::make_shared<Value>(default_value),
-            std::forward<Read>(read) };
+            std::forward<Read>(read), false };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
