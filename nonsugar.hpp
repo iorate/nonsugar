@@ -9,6 +9,10 @@
 #ifndef NONSUGAR_HPP
 #define NONSUGAR_HPP
 
+#if __cplusplus > 201402L
+#define NONSUGAR_USE_STD_OPTIONAL
+#endif
+
 #include <algorithm>
 #include <cstddef>
 #include <exception>
@@ -23,6 +27,9 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#ifdef NONSUGAR_USE_STD_OPTIONAL
+#include <optional>
+#endif
 
 namespace boost {
 
@@ -56,6 +63,15 @@ struct optional_traits<boost::optional<T>>
     using value_type = T;
     static boost::optional<T> construct(T const &v) { return v; }
 };
+
+#ifdef NONSUGAR_USE_STD_OPTIONAL
+template <class T>
+struct optional_traits<std::optional<T>>
+{
+    using value_type = T;
+    static std::optional<T> construct(T const &v) { return v; }
+};
+#endif
 
 template <class T, class = void>
 struct container_traits {};
@@ -418,6 +434,15 @@ public:
 
     template <OptionType Option>
     auto get_shared() const { return priv_value<Option>(); }
+
+#ifdef NONSUGAR_USE_STD_OPTIONAL
+    template <OptionType Option>
+    auto get_optional() const
+    {
+        auto const &v = priv_value<Option>();
+        return v ? std::optional(*v) : std::nullopt;
+    }
+#endif
 };
 
 namespace detail {

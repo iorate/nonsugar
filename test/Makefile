@@ -11,7 +11,8 @@ EXEEXT := .exe
 endif
 
 CXX := g++
-CXXFLAGS := -std=c++14 -Wall -Wextra -pedantic-errors -I..
+STD := c++14
+CXXFLAGS := -std=$(STD) -Wall -Wextra -pedantic-errors -I..
 LDFLAGS := -lboost_unit_test_framework-mt
 OBJS := $(patsubst %.cpp,%.o,$(wildcard *.cpp))
 PROGRAM := nonsugar_test$(EXEEXT)
