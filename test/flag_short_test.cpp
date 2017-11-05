@@ -1,12 +1,13 @@
 
 // nonsugar
 //
-// Copyright iorate 2016.
+// Copyright iorate 2016-2017.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #define BOOST_TEST_DYN_LINK
+#define BOOST_TEST_MODULE flag_short_test
 
 #include <boost/test/unit_test.hpp>
 
@@ -115,13 +116,13 @@ BOOST_AUTO_TEST_CASE(flag_short_fail_value)
         try {
             std::vector<std::string> const args = { "-a1", "-b", "x", "-c", "5" };
             parse(args.begin(), args.end(), cmd);
-        } catch (error const &e) {
-            BOOST_TEST(e.message() == "flag_short_fail_value: invalid argument: -b x");
+        } catch (error const &er) {
+            BOOST_TEST(er.message() == "flag_short_fail_value: invalid argument: -b x");
             try {
                 std::vector<std::string> const args = { "-a1", "-b", "3", "-c" };
                 parse(args.begin(), args.end(), cmd);
-            } catch (error const &e) {
-                BOOST_TEST(e.message() == "flag_short_fail_value: argument required: -c");
+            } catch (error const &err) {
+                BOOST_TEST(err.message() == "flag_short_fail_value: argument required: -c");
                 return;
             }
             BOOST_TEST(false);

@@ -6,9 +6,8 @@
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-#if __cplusplus > 201402L
-
 #define BOOST_TEST_DYN_LINK
+#define BOOST_TEST_MODULE std_optional_test
 
 #include <boost/test/unit_test.hpp>
 
@@ -43,5 +42,3 @@ BOOST_AUTO_TEST_CASE(get_optional)
     BOOST_TEST((opts.get_optional<'A'>() == std::nullopt));
     BOOST_TEST((opts.get_optional<'B'>() == 42));
 }
-
-#endif

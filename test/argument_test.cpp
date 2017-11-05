@@ -1,12 +1,13 @@
 
 // nonsugar
 //
-// Copyright iorate 2016.
+// Copyright iorate 2016-2017.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #define BOOST_TEST_DYN_LINK
+#define BOOST_TEST_MODULE argument_test
 
 #include <boost/test/unit_test.hpp>
 
@@ -61,18 +62,18 @@ BOOST_AUTO_TEST_CASE(argument_failure1)
         try {
             std::vector<std::string> args = { "iorate", "foo" };
             parse(args.begin(), args.end(), cmd);
-        } catch (error const &e) {
-            BOOST_TEST(e.message() == "foobar: invalid argument: A_INT=foo");
+        } catch (error const &er) {
+            BOOST_TEST(er.message() == "foobar: invalid argument: A_INT=foo");
             try {
                 std::vector<std::string> args = { "iorate", "12", "bar" };
                 parse(args.begin() , args.end(), cmd);
-            } catch (error const &e) {
-                BOOST_TEST(e.message() == "foobar: invalid argument: B_INT=bar");
+            } catch (error const &err) {
+                BOOST_TEST(err.message() == "foobar: invalid argument: B_INT=bar");
                 try {
                     std::vector<std::string> args = { "iorate", "12", "23", "34", "baz" };
                     parse(args.begin(), args.end(), cmd);
-                } catch (error const &e) {
-                    BOOST_TEST(e.message() == "foobar: invalid argument: C_INT=baz");
+                } catch (error const &errr) {
+                    BOOST_TEST(errr.message() == "foobar: invalid argument: C_INT=baz");
                     return;
                 }
             }

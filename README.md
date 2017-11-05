@@ -92,33 +92,34 @@ using namespace nonsugar; // if you like
 ```cpp
     // Create a command.
     auto const cmd = command<char>("compiler", "nonsugar example")
-     // Template parameter is an integer or enumeration type that identifies options.
-     // 1st parameter is the program name used in usage and error messages.
-     // 2nd parameter is the program summary used in usage (default: "").
+     // The template parameter is an integer or enumeration type that identifies options.
+     // The 1st parameter is the program name used in a usage and error messages.
+     // The 2nd parameter is the program summary used in a usage (default: "").
 
-        // Add a flag without value.
+        // Add a flag without a value.
         .flag<'h'>({'h'}, {"help"}, "produce help message", true)
          // The template parameter is the option identifier.
-         // 1st parameter is the list of short names.
-         // 2nd parameter is the list of long names.
-         // 3rd parameter is the flag summary used in usage.
-         // 4th parameter is whether to skip parsing of subcommands and arguments (default: false).
+         // The 1st parameter is the list of short names.
+         // The 2nd parameter is the list of long names.
+         // The 3rd parameter is the flag summary used in a usage.
+         // The 4th parameter is whether to skip parsing of subcommands and arguments (default:
+         // false).
          //  It is useful for --help and --version flag.
 
-        // Add a flag with value.
+        // Add a flag with a value.
         .flag<'o', int>({}, {"optimization","optimisation"}, "N", "optimization level", 10)
-         // 2nd template parameter is the value type.
+         // The 2nd template parameter is the value type.
          //  If an optional type (e.g. boost::optional<T>) is given, the value is optional.
          //  If a container type (e.g. std::vector<T>) is given, the flag can be specified multiple
          //  times.
-         // 3rd parameter is the value placeholder used in usage.
-         // 5th parameter is the default value (optional).
+         // The 3rd parameter is the value placeholder used in a usage.
+         // The 5th parameter is the default value (optional).
 
         // Add an argument.
         .argument<'i', std::vector<std::string>>("INPUT-FILE")
-         // 1st template parameter is the option identifier.
-         // 2nd template parameter is the value type.
-         // The parameter is the value placeholder used in usage.
+         // The 1st template parameter is the option identifier.
+         // The 2nd template parameter is the value type.
+         // The parameter is the value placeholder used in a usage.
         ;
 ```
 3\. Parse the command line and get the option map.
@@ -127,7 +128,7 @@ try {
     // Parse the command line and get the option map.
     auto const opts = parse(argc, argv, cmd);
 } catch (error const &e) {
- // When the parsing is failed, an object of basic_error<String> is thrown (error is the typedef of
+ // When the parsing failed, an object of basic_error<String> is thrown (error is a typedef of
  // basic_error<std::string>).
 
     // Get the error message.
@@ -207,15 +208,16 @@ try {
         // Add a subcommand.
         .subcommand<'H'>("hello", "hello command", helloCmd)
          // The template parameter is the option identifier.
-         // 1st parameter is the subcommand name.
-         // 2nd parameter is the subcommand summary used in usage.
-         // 3rd parameter is the subcommand itself.
+         // The 1st parameter is the subcommand name.
+         // The 2nd parameter is the subcommand summary used in a usage.
+         // The 3rd parameter is the subcommand itself.
 
         // Add a subcommand.
         .subcommand<'A'>("add", "add command", addCmd)
 
         .flag<'h'>({'h'}, {"help"}, "produce help message", true)
-         // 4th parameter indicates that the subcommands are ignored when this flag is specified.
+         // The 4th parameter indicates that the subcommands are ignored when this flag is
+         // specified.
         ;
 
     // Parse the command line.

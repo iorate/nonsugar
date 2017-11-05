@@ -9,7 +9,7 @@
 #ifndef NONSUGAR_HPP
 #define NONSUGAR_HPP
 
-#if __cplusplus > 201402L
+#if __cplusplus >= 201703L
 #define NONSUGAR_USE_STD_OPTIONAL
 #endif
 
@@ -440,7 +440,7 @@ public:
     auto get_optional() const
     {
         auto const &v = priv_value<Option>();
-        return v ? std::optional(*v) : std::nullopt;
+        return v ? std::make_optional(*v) : std::nullopt;
     }
 #endif
 };

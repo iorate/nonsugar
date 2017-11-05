@@ -1,7 +1,7 @@
 
 // nonsugar
 //
-// Copyright iorate 2016.
+// Copyright iorate 2016-2017.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -21,18 +21,18 @@ int main(int argc, char **argv)
     enum class GreetOption { Help, Message, Decorate, Name };
     enum class ConnectOption { Help, Host, Port };
 
-    auto const greetCmd = command<GreetOption>("subcmd greet", "Greeting command")
+    auto const greetCmd = command<GreetOption>("subcmd_od greet", "Greeting command")
         .flag<GreetOption::Help>({'?'}, {"help"}, "display this help and exit", true)
         .flag<GreetOption::Message, std::string>({'g'}, {"greet"}, "STRING", "greeting message", "Hello")
         .flag<GreetOption::Decorate>({}, {"decorate"}, "decorate message")
         .argument<GreetOption::Name, std::string>("NAME")
         ;
-    auto const connectCmd = command<ConnectOption>("subcmd connect", "Connect command")
+    auto const connectCmd = command<ConnectOption>("subcmd_od connect", "Connect command")
         .flag<ConnectOption::Help>({'?'}, {"help"}, "display this help and exit", true)
         .flag<ConnectOption::Host, std::string>({'h'}, {"host"}, "HOST", "host name", "localhost")
         .flag<ConnectOption::Port, int>({'p'}, {"port"}, "PORT", "port number", 8080)
         ;
-    auto const cmd = command<Option>("subcmd", "Test program for sub commands")
+    auto const cmd = command<Option>("subcmd_od", "Test program for sub commands")
         .flag<Option::Help>({'?'}, {"help"}, "display this help and exit", true)
         .subcommand<Option::Greet>("greet", "Greeting command", greetCmd)
         .subcommand<Option::Connect>("connect", "Connect command", connectCmd)

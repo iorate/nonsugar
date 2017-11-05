@@ -1,12 +1,13 @@
 
 // nonsugar
 //
-// Copyright iorate 2016.
+// Copyright iorate 2016-2017.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #define BOOST_TEST_DYN_LINK
+#define BOOST_TEST_MODULE flag_long_test
 
 #include <boost/test/unit_test.hpp>
 
@@ -65,8 +66,8 @@ BOOST_AUTO_TEST_CASE(flag_long_fail_ambiguous)
         try {
             std::vector<std::string> const args = { "--a" };
             parse(args.begin(), args.end(), cmd);
-        } catch (error const &e) {
-            BOOST_TEST(e.message() == "flag_long_fail_ambiguous: ambiguous option: --a");
+        } catch (error const &er) {
+            BOOST_TEST(er.message() == "flag_long_fail_ambiguous: ambiguous option: --a");
             std::vector<std::string> const args = { "--b", "--bb" };
             auto const opts = parse(args.begin(), args.end(), cmd);
             BOOST_TEST(opts.has<'b'>());

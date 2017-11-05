@@ -1,12 +1,13 @@
 
 // nonsugar
 //
-// Copyright iorate 2016.
+// Copyright iorate 2016-2017.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #define BOOST_TEST_DYN_LINK
+#define BOOST_TEST_MODULE subcommand_test
 
 #include <boost/test/unit_test.hpp>
 
@@ -58,13 +59,13 @@ BOOST_AUTO_TEST_CASE(subcommand_failure1)
         try {
             std::vector<std::string> args = { "sub" };
             parse(args.begin(), args.end(), cmd);
-        } catch (error const &e) {
-            BOOST_TEST(e.message() == "calc: unrecognized command: sub");
+        } catch (error const &er) {
+            BOOST_TEST(er.message() == "calc: unrecognized command: sub");
             try {
                 std::vector<std::string> args = {};
                 parse(args.begin(), args.end(), cmd);
-            } catch (error const &e) {
-                BOOST_TEST(e.message() == "calc: command required");
+            } catch (error const &err) {
+                BOOST_TEST(err.message() == "calc: command required");
                 return;
             }
         }

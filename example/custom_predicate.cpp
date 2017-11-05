@@ -15,17 +15,9 @@ using namespace nonsugar;
 
 int main(int argc, char *argv[])
 try {
-    auto const cmd = command<char>("custom")
+auto const cmd = command<char>("custom_predicate")
     .flag<'t', int>({'t'}, {"transparency"}, "N", "Set the transparency (0-255)",
-        [](std::string const &s) -> std::shared_ptr<int>
-        {
-            try {
-                int const n = boost::lexical_cast<int>(s);
-                return 0 <= n && n <= 255 ? std::make_shared<int>(n) : nullptr;
-            } catch (boost::bad_lexical_cast const &) {
-                return nullptr;
-            }
-        })
+        predicate<int>([](int n) { return 0 <= n && n <= 255; }))
     ;
     auto const opts = parse(argc, argv, cmd);
     if (opts.has<'t'>()) std::cout << "transparency: " << opts.get<'t'>() << "\n";

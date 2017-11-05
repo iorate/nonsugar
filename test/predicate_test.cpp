@@ -1,12 +1,13 @@
 
 // nonsugar
 //
-// Copyright iorate 2016.
+// Copyright iorate 2016-2017.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #define BOOST_TEST_DYN_LINK
+#define BOOST_TEST_MODULE predicate_test
 
 #include <boost/test/unit_test.hpp>
 
@@ -34,8 +35,8 @@ BOOST_AUTO_TEST_CASE(test_predicate)
         args = { "-babd" };
         try {
             parse(args.begin(), args.end(), cmd);
-        } catch (error const &e) {
-            BOOST_TEST(e.message() == "test_predicate: invalid argument: -b abd");
+        } catch (error const &er) {
+            BOOST_TEST(er.message() == "test_predicate: invalid argument: -b abd");
             args = { "-a500", "-b", "def" };
             auto const opts = parse(args.begin(), args.end(), cmd);
             BOOST_TEST(opts.get<'A'>() == 500);
