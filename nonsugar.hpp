@@ -242,10 +242,17 @@ inline basic_command<String, OptionType, Flags, Subcommands, Arguments> make_com
     return { header, footer, flags, subcommands, arguments };
 }
 
+template <class Tuple, class T, std::size_t ...Indices>
+inline auto tuple_append_impl(Tuple const &tuple, T &&t, std::index_sequence<Indices...>)
+{
+    return std::make_tuple(std::get<Indices>(tuple)..., std::forward<T>(t));
+}
+
 template <class Tuple, class T>
 inline auto tuple_append(Tuple const &tuple, T &&t)
 {
-    return std::tuple_cat(tuple, std::make_tuple(std::forward<T>(t)));
+    return tuple_append_impl(
+        tuple, std::forward<T>(t), std::make_index_sequence<std::tuple_size<Tuple>::value>());
 }
 
 } // namespace detail
