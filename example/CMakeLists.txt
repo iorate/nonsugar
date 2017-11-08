@@ -8,15 +8,28 @@
 
 add_custom_target(example)
 
-set(example_names compiler custom custom_predicate subcmd subcmd_od usage)
-if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES GNU OR MSVC)
-  set(example_names ${example_names} wide)
+find_package(Boost)
+if(NOT Boost_FOUND)
+  message("Boost is required to build some examples.")
+endif()
+
+set(example_names compiler subcmd subcmd_od usage)
+if(Boost_FOUND)
+  list(APPEND example_names custom custom_predicate)
+endif()
+if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES GNU OR CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+  list(APPEND example_names wide)
 endif()
 
 foreach(example_name IN LISTS example_names)
   add_executable(${example_name} ${example_name}.cpp)
   add_dependencies(example ${example_name})
 endforeach()
+
+if(Boost_FOUND)
+  target_include_directories(custom PRIVATE ${Boost_INCLUDE_DIRS})
+  target_include_directories(custom_predicate PRIVATE ${Boost_INCLUDE_DIRS})
+endif()
 
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES GNU)
   target_link_libraries(wide PRIVATE -municode)

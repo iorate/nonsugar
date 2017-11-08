@@ -77,7 +77,7 @@ input files: a.cpp b.cpp
 * unit tests
 
 ## Requirement
-A compiler that supports C++14. `nonsugar` is tested under g++ 7.2.0 and clang++ 5.0.0.
+A compiler that supports C++14. `nonsugar` is tested under GCC 7.2, Clang 5.0 and Visual C++ 14.1.
 
 ## Installation
 Just copy `nonsugar.hpp` to your include directory.

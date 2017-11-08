@@ -9,6 +9,12 @@
 #ifndef NONSUGAR_HPP
 #define NONSUGAR_HPP
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable: 4100)
+#pragma warning(disable: 4127)
+#endif
+
 #if __cplusplus >= 201703L
 #define NONSUGAR_USE_STD_OPTIONAL
 #endif
@@ -324,8 +330,9 @@ public:
         std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
         String const &placeholder, String const &help, Read &&read) const
     {
+        std::function<std::shared_ptr<Value> (String const &)> r = std::forward<Read>(read);
         detail::flag<String, OptionType, Option, Value> f {
-            short_names, long_names, placeholder, help, {}, std::forward<Read>(read), false };
+            short_names, long_names, placeholder, help, {}, std::move(r), false };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -337,9 +344,10 @@ public:
         String const &placeholder, String const &help, Value const &default_value,
         Read &&read) const
     {
+        std::function<std::shared_ptr<Value> (String const &)> r = std::forward<Read>(read);
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, std::make_shared<Value>(default_value),
-            std::forward<Read>(read), false };
+            std::move(r), false };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -1074,5 +1082,9 @@ inline auto predicate(F &&f)
 }
 
 } // namespace nonsugar
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #endif
