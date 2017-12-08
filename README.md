@@ -267,10 +267,10 @@ $ ./subcmd add 3 4
 ```
 
 ### Custom value reader
-By default, the flag value is translated by `std::basic_stringstream`. You can customize this behavior by giving a custom value reader to `flag()`.  A custom value reader shall be have a signature `std::shared_ptr<Value> (String const &)`. It shall return `nullptr` when an invalid value is passed.
+By default, the flag value is translated by `std::basic_stringstream`. You can customize this behavior by giving a custom value reader to `flag()`.  A custom value reader shall have a signature `std::shared_ptr<Value> (String const &)`. It shall return `nullptr` when an invalid value is passed.
 ```cpp
 auto const cmd = command<char>("custom")
-    .flag<'t', int>({'t'}, {"transparency"}, "Set the transparency (0-255)",
+    .flag<'t', int>({'t'}, {"transparency"}, "N", "Set the transparency (0-255)",
         [](std::string const &s) -> std::shared_ptr<int>
         {
             try {
@@ -285,7 +285,7 @@ auto const cmd = command<char>("custom")
 If you'd just like to validate the value, you can use `predicate()` helper function.
 ```cpp
 auto const cmd = command<char>("custom")
-    .flag<'t', int>({'t'}, {"transparency"}, "Set the transparency (0-255)",
+    .flag<'t', int>({'t'}, {"transparency"}, "N", "Set the transparency (0-255)",
         predicate<int>([](int n) { return 0 <= n && n <= 255; }))
     ;
 ```
