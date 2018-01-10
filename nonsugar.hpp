@@ -15,7 +15,11 @@
 #pragma warning(disable: 4127)
 #endif
 
-#if __cplusplus >= 201703L
+#ifdef _MSVC_LANG
+#if _MSVC_LANG >= 201703L
+#define NONSUGAR_USE_STD_OPTIONAL
+#endif
+#elif __cplusplus >= 201703L
 #define NONSUGAR_USE_STD_OPTIONAL
 #endif
 
