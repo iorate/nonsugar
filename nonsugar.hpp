@@ -1036,8 +1036,8 @@ inline typename Command::string_type usage(Command const &command)
                     if (std::exchange(first, false)) table.emplace_back(short_, long_, h);
                     else table.emplace_back(string_type(), string_type(), h);
                 }
-                c0_max = std::max(c0_max, short_.size());
-                c1_max = std::max(c1_max, long_.size());
+                c0_max = (std::max)(c0_max, short_.size());
+                c1_max = (std::max)(c1_max, long_.size());
             });
         for (auto const &row : table) {
             ss << "  " << std::get<0>(row);
