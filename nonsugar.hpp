@@ -1062,7 +1062,7 @@ inline typename Command::string_type usage(Command const &command)
                     if (std::exchange(first, false)) table.emplace_back(subcmd.name, h);
                     else table.emplace_back(string_type(), h);
                 }
-                c0_max = std::max(c0_max, subcmd.name.size());
+                c0_max = (std::max)(c0_max, subcmd.name.size());
             });
         for (auto const &row : table) {
             ss << "  " << std::get<0>(row);
