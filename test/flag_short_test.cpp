@@ -1,7 +1,7 @@
 
 // nonsugar
 //
-// Copyright iorate 2016-2017.
+// Copyright iorate 2016-2018.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -22,16 +22,18 @@ using namespace nonsugar;
 BOOST_AUTO_TEST_CASE(flag_short_value)
 {
     auto const cmd =command<char>("flag_short_value", "")
-        .flag<'A'>({'a'}, {}, "")
+        .flag<'A'>({'a'}, {}, "") // deprecated style
         .flag<'B', int>({'b'}, {}, "I", "")
         .flag<'C', int>({'c'}, {}, "I", "")
         .flag<'D', std::shared_ptr<int>>({'d'}, {}, "I", "")
         .flag<'E', boost::optional<int>>({'e'}, {}, "I", "")
         .flag<'F', boost::optional<int>>({'f'}, {}, "I", "")
         .flag<'G', std::vector<std::string>>({'g'}, {}, "S", "")
+        .flag<'H'>({'h'}, {}, "", "")
+        .flag<'I', int>({'i'}, {}, "I", "")
         ;
     std::vector<std::string> const args = {
-        "-a", "-b23", "-c", "42", "-d", "-e29", "-f", "-gfoo", "-g" "bar" };
+        "-a", "-b23", "-c", "42", "-d", "-e29", "-f", "-gfoo", "-g" "bar", "-h" };
     auto const opts = parse(args.begin(), args.end(), cmd);
     BOOST_TEST(opts.has<'A'>());
     BOOST_TEST((opts.has<'B'>() && opts.get<'B'>() == 23));
@@ -43,6 +45,8 @@ BOOST_AUTO_TEST_CASE(flag_short_value)
     BOOST_TEST(
         opts.get<'G'>() == (std::vector<std::string>{"foo", "bar"}),
         boost::test_tools::per_element());
+    BOOST_TEST(opts.has<'H'>());
+    BOOST_TEST(!opts.has<'I'>());
 }
 
 BOOST_AUTO_TEST_CASE(flag_short_bundling)

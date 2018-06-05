@@ -1,7 +1,7 @@
 
 // nonsugar
 //
-// Copyright iorate 2016-2017.
+// Copyright iorate 2016-2018.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -109,12 +109,15 @@ template <class T>
 struct is_container<T, void_t<typename container_traits<T>::value_type>> : std::true_type {};
 
 template <class String, class T>
-struct is_container_but_string :
+struct is_container_and_not_string :
     std::integral_constant<bool, !std::is_same<String, T>::value && is_container<T>::value>
 {};
 
 template <class String, class T, class = void>
 struct value_of { using type = T; };
+
+template <class String>
+struct value_of<String, void> { using type = int; };
 
 template <class String, class T>
 struct value_of<String, T, std::enable_if_t<is_optional<T>::value>>
@@ -123,7 +126,7 @@ struct value_of<String, T, std::enable_if_t<is_optional<T>::value>>
 };
 
 template <class String, class T>
-struct value_of<String, T, std::enable_if_t<is_container_but_string<String, T>::value>>
+struct value_of<String, T, std::enable_if_t<is_container_and_not_string<String, T>::value>>
 {
     using type = typename container_traits<T>::value_type;
 };
@@ -141,7 +144,7 @@ struct flag
     String help;
     std::shared_ptr<Value> default_value;
     std::function<std::shared_ptr<typename value_of<String, Value>::type> (String const &)> read;
-    bool is_help_or_version;
+    bool exclusive;
 };
 
 template <class String, class OptionType, OptionType Option, class Command>
@@ -212,7 +215,7 @@ using u16error = basic_error<std::u16string>;
 using u32error = basic_error<std::u32string>;
 
 template <class String, class T, class = void>
-struct default_read
+struct value_read
 {
     std::shared_ptr<T> operator()(String const &s) const
     {
@@ -226,7 +229,7 @@ struct default_read
 };
 
 template <class String>
-struct default_read<String, String>
+struct value_read<String, String>
 {
     std::shared_ptr<String> operator()(String const &s) const
     {
@@ -267,6 +270,12 @@ inline auto tuple_append(Tuple const &tuple, T &&t)
 
 } // namespace detail
 
+enum class flag_type
+{
+    normal,
+    exclusive
+};
+
 template <class String, class OptionType, class Flags, class Subcommands, class Arguments>
 class basic_command
 {
@@ -289,10 +298,13 @@ public:
         m_arguments(arguments)
     {}
 
-    template <OptionType Option>
+    template <
+        OptionType Option, class Bool = bool,
+        std::enable_if_t<std::is_same<Bool, bool>::value> * = nullptr>
+    [[deprecated("use `flag<Option>(short_names, long_names, placeholder, help[, type])` instead.")]]
     auto flag(
         std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
-        String const &help, bool is_help_or_version = false) const
+        String const &help, Bool is_help_or_version = false) const
     {
         detail::flag<String, OptionType, Option, void> f {
             short_names, long_names, {}, help, {}, {}, is_help_or_version };
@@ -301,14 +313,15 @@ public:
             m_arguments);
     }
 
-    template <OptionType Option, class Value>
+    template <OptionType Option, class Value = void>
     auto flag(
         std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
-        String const &placeholder, String const &help) const
+        String const &placeholder, String const &help, flag_type type = flag_type::normal) const
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, {},
-            default_read<String, typename detail::value_of<String, Value>::type>(), false };
+            value_read<String, typename detail::value_of<String, Value>::type>(),
+            type == flag_type::exclusive };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -317,11 +330,13 @@ public:
     template <OptionType Option, class Value>
     auto flag(
         std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
-        String const &placeholder, String const &help, Value const &default_value) const
+        String const &placeholder, String const &help, Value const &default_value,
+        flag_type type = flag_type::normal) const
     {
         detail::flag<String, OptionType, Option, Value> f {
             short_names, long_names, placeholder, help, std::make_shared<Value>(default_value),
-            default_read<String, typename detail::value_of<String, Value>::type>(), false };
+            value_read<String, typename detail::value_of<String, Value>::type>(),
+            type == flag_type::exclusive };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, detail::tuple_append(m_flags, std::move(f)), m_subcommands,
             m_arguments);
@@ -330,6 +345,7 @@ public:
     template <
         OptionType Option, class Value, class Read,
         std::enable_if_t<!std::is_convertible<Read, Value>::value> * = nullptr>
+    [[deprecated("process values after parsing or specialize `nonsugar::value_read` instead.")]]
     auto flag(
         std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
         String const &placeholder, String const &help, Read &&read) const
@@ -343,6 +359,7 @@ public:
     }
 
     template <OptionType Option, class Value, class Read>
+    [[deprecated("process values after parsing or specialize `nonsugar::value_read` instead.")]]
     auto flag(
         std::initializer_list<char_type> short_names, std::initializer_list<String> long_names,
         String const &placeholder, String const &help, Value const &default_value,
@@ -370,13 +387,14 @@ public:
     auto argument(String const &placeholder) const
     {
         detail::argument<String, OptionType, Option, Value> a {
-            placeholder, default_read<String, typename detail::value_of<String, Value>::type>() };
+            placeholder, value_read<String, typename detail::value_of<String, Value>::type>() };
         return detail::make_command<String, OptionType>(
             m_header, m_footer, m_flags, m_subcommands,
             detail::tuple_append(m_arguments, std::move(a)));
     }
 
     template <OptionType Option, class Value, class Read>
+    [[deprecated("process values after parsing or specialize `nonsugar::value_read` instead.")]]
     auto argument(String const &placeholder, Read &&read) const
     {
         detail::argument<String, OptionType, Option, Value> a {
@@ -586,7 +604,7 @@ struct parse_flag_long<String, Value, std::enable_if_t<is_optional<Value>::value
 
 template <class String, class Value>
 struct parse_flag_long<
-    String, Value, std::enable_if_t<is_container_but_string<String, Value>::value>>
+    String, Value, std::enable_if_t<is_container_and_not_string<String, Value>::value>>
 {
     template <class Iterator, class Flag>
     void operator()(
@@ -671,7 +689,7 @@ struct parse_flag_short<String, Value, std::enable_if_t<is_optional<Value>::valu
 
 template <class String, class Value>
 struct parse_flag_short<
-    String, Value, std::enable_if_t<is_container_but_string<String, Value>::value>>
+    String, Value, std::enable_if_t<is_container_and_not_string<String, Value>::value>>
 {
     template <class NameIterator, class Iterator, class Flag>
     void operator()(
@@ -734,7 +752,7 @@ struct parse_argument<String, Value, std::enable_if_t<is_optional<Value>::value>
 
 template <class String, class Value>
 struct parse_argument<
-    String, Value, std::enable_if_t<is_container_but_string<String, Value>::value>>
+    String, Value, std::enable_if_t<is_container_and_not_string<String, Value>::value>>
 {
     template <class Iterator, class Argument>
     void operator()(
@@ -788,7 +806,7 @@ inline typename detail::to_option_map<Command>::type parse(
     std::vector<string_type> const args(begin, end);
     auto arg_it = args.begin();
     auto const arg_last = args.end();
-    bool is_help_or_version = false;
+    bool exclusive = false;
 
     for (; arg_it != arg_last; ++arg_it) {
         if (*arg_it == _("--")) {
@@ -843,7 +861,7 @@ inline typename detail::to_option_map<Command>::type parse(
                             if (!err.empty()) {
                                 throw error_type(command.m_header + _(": ") + err);
                             }
-                            if (flg.is_help_or_version) is_help_or_version = true;
+                            if (flg.exclusive) exclusive = true;
                         }
                     }
                 });
@@ -877,7 +895,7 @@ inline typename detail::to_option_map<Command>::type parse(
                             if (!err.empty()) {
                                 throw error_type(command.m_header + _(": ") + err);
                             }
-                            if (flg.is_help_or_version) is_help_or_version = true;
+                            if (flg.exclusive) exclusive = true;
                         }
                     });
             }
@@ -887,7 +905,7 @@ inline typename detail::to_option_map<Command>::type parse(
         }
     }
 
-    if (is_help_or_version) return opts;
+    if (exclusive) return opts;
 
     if (std::tuple_size<typename Command::subcommand_tuple_type>::value != 0) {
         if (arg_it == arg_last) throw error_type(command.m_header + _(": command required"));
@@ -990,7 +1008,7 @@ inline typename Command::string_type usage(Command const &command)
             using value_type = typename detail::remove_cvr_t<decltype(arg)>::value_type;
             if (detail::is_optional<value_type>::value) {
                 ss << " [" << arg.placeholder << "]";
-            } else if (detail::is_container_but_string<string_type, value_type>::value) {
+            } else if (detail::is_container_and_not_string<string_type, value_type>::value) {
                 ss << " [" << arg.placeholder << "...]";
             } else {
                 ss << " " << arg.placeholder;
@@ -1075,12 +1093,13 @@ inline typename Command::string_type usage(Command const &command)
 }
 
 template <class T, class F>
+[[deprecated("validate values after parsing instead.")]]
 inline auto predicate(F &&f)
 {
     return [f = std::forward<F>(f)](auto const &s) -> std::shared_ptr<T>
         {
             using string_type = detail::remove_cvr_t<decltype(s)>;
-            auto const v = default_read<string_type, T>()(s);
+            auto const v = value_read<string_type, T>()(s);
             return v && f(*v) ? v : nullptr;
         };
 }

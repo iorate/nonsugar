@@ -1,7 +1,7 @@
 
 // nonsugar
 //
-// Copyright iorate 2016-2017.
+// Copyright iorate 2016-2018.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -22,14 +22,15 @@ using namespace nonsugar;
 BOOST_AUTO_TEST_CASE(flag_long_value)
 {
     auto const cmd = command<char>("flag_long_value", "")
-        .flag<'v'>({}, {"version"}, "")
-        .flag<'V'>({}, {"verbose"}, "")
+        .flag<'v'>({}, {"version"}, "") // deprecated style
+        .flag<'V'>({}, {"verbose"}, "", "")
         .flag<'a', int>({}, {"a"}, "N", "")
         .flag<'b', int>({}, {"b"}, "N", "")
         .flag<'c', boost::optional<int>>({}, {"c"}, "N", "")
         .flag<'d', boost::optional<int>>({}, {"d"}, "N", "")
         .flag<'e', boost::optional<int>>({}, {"e"}, "N", "")
         .flag<'f', std::vector<std::string>>({}, {"f"}, "STRING", "")
+        .flag<'g', int>({}, {"g"}, "N", "")
         ;
     std::vector<std::string> const args = {
         "--vers", "--verb", "--a=23", "--b", "42",
@@ -46,6 +47,7 @@ BOOST_AUTO_TEST_CASE(flag_long_value)
     BOOST_TEST(
         opts.get<'f'>() == (std::vector<std::string>{"foo", "bar"}),
         boost::test_tools::per_element());
+    BOOST_TEST(!opts.has<'g'>());
 }
 
 BOOST_AUTO_TEST_CASE(flag_long_fail_ambiguous)

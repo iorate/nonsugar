@@ -1,7 +1,7 @@
 
 // nonsugar
 //
-// Copyright iorate 2016-2017.
+// Copyright iorate 2016-2018.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -28,15 +28,16 @@ try {
         // Add a subcommand.
         .subcommand<'H'>("hello", "hello command", helloCmd)
          // The template argument is the option identifier.
-         // 1st argument is the subcommand name.
-         // 2nd argument is the subcommand summary used in usage.
-         // 3rd argument is the subcommand itself.
+         // The 1st parameter is the subcommand name.
+         // The 2nd parameter is the subcommand summary used in usage.
+         // The 3rd parameter is the subcommand itself.
 
         // Add a subcommand.
         .subcommand<'A'>("add", "add command", addCmd)
 
-        .flag<'h'>({'h'}, {"help"}, "produce help message", true)
-         // 4th argument indicates that the subcommands are ignored when this flag is specified.
+        .flag<'h'>({'h'}, {"help"}, "", "produce help message", flag_type::exclusive)
+         // flag_type::exclusive indicates that the subcommands are ignored when this flag is
+         // specified.
         ;
 
     // Parse the command line.

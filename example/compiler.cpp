@@ -1,7 +1,7 @@
 
 // nonsugar
 //
-// Copyright iorate 2016.
+// Copyright iorate 2016-2018.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -15,8 +15,8 @@ using namespace nonsugar;
 int main(int argc, char *argv[])
 try {
     auto const cmd = command<char>("compiler", "nonsugar example")
-        .flag<'h'>({}, {"help"}, "produce help message")
-        .flag<'v'>({'v'}, {"version"}, "print version string")
+        .flag<'h'>({}, {"help"}, "", "produce help message")
+        .flag<'v'>({'v'}, {"version"}, "", "print version string")
         .flag<'o', int>({}, {"optimization"}, "N", "optimization level")
         .flag<'I', std::vector<std::string>>({'I'}, {"include-path"}, "PATH", "include path")
         .argument<'i', std::vector<std::string>>("INPUT-FILE")

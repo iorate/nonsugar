@@ -2,10 +2,11 @@
 A simple command line parser for C++
 
 ## Description
-`nonsugar` is a single header library that provides command line parsers for C++14. It is inspired by [Boost.Program\_options](http://www.boost.org/doc/libs/1_62_0/doc/html/program_options.html), [optparse-declarative](https://github.com/tanakh/optparse-declarative) and so on.
+`nonsugar` is a single header library that provides command line parsers for C++14. It is inspired by [Boost.Program\_options](http://www.boost.org/doc/libs/release/doc/html/program_options.html), [optparse-declarative](https://github.com/tanakh/optparse-declarative) and so on.
 
 ## Example
-This is a reimplementation of [Boost.Program\_options tutorial](http://www.boost.org/doc/libs/1_62_0/doc/html/program_options/tutorial.html).
+This is a reimplementation of [Boost.Program\_options tutorial](http://www.boost.org/doc/libs/release/doc/html/program_options/tutorial.html).
+
 ```cpp
 // compiler.cpp
 #include <iostream>
@@ -17,8 +18,8 @@ using namespace nonsugar;
 int main(int argc, char *argv[])
 try {
     auto const cmd = command<char>("compiler", "nonsugar example")
-        .flag<'h'>({}, {"help"}, "produce help message")
-        .flag<'v'>({'v'}, {"version"}, "print version string")
+        .flag<'h'>({}, {"help"}, "", "produce help message")
+        .flag<'v'>({'v'}, {"version"}, "", "print version string")
         .flag<'o', int>({}, {"optimization"}, "N", "optimization level")
         .flag<'I', std::vector<std::string>>({'I'}, {"include-path"}, "PATH", "include path")
         .argument<'i', std::vector<std::string>>("INPUT-FILE")
@@ -48,7 +49,8 @@ try {
     return 1;
 }
 ```
-``` shell
+
+```
 $ g++ -I.. compiler.cpp -o compiler
 
 $ ./compiler --help
@@ -77,33 +79,37 @@ input files: a.cpp b.cpp
 * unit tests
 
 ## Requirement
-A compiler that supports C++14. `nonsugar` is tested under GCC 7.2, Clang 5.0 and Visual C++ 14.1.
+A compiler that supports C++14. `nonsugar` is tested under GCC 7.3, Clang 5.0 and Visual C++ 15.7.
 
 ## Installation
 Just copy `nonsugar.hpp` to your include directory.
 
 ## Usage
 1\. Include `nonsugar.hpp`.
+
 ```cpp
 #include <nonsugar.hpp>
 using namespace nonsugar; // if you like
 ```
+
 2\. Create a command.
+
 ```cpp
     // Create a command.
     auto const cmd = command<char>("compiler", "nonsugar example")
      // The template parameter is an integer or enumeration type that identifies options.
      // The 1st parameter is the program name used in a usage and error messages.
-     // The 2nd parameter is the program summary used in a usage (default: "").
+     // The 2nd parameter is the program summary used in a usage (optional).
 
         // Add a flag without a value.
-        .flag<'h'>({'h'}, {"help"}, "produce help message", true)
+        .flag<'h'>({'h'}, {"help"}, "", "produce help message", flag_type::exclusive)
          // The template parameter is the option identifier.
          // The 1st parameter is the list of short names.
          // The 2nd parameter is the list of long names.
-         // The 3rd parameter is the flag summary used in a usage.
-         // The 4th parameter is whether to skip parsing of subcommands and arguments (default:
-         // false).
+         // The 3rd parameter is the value placeholder, which is never used.
+         // The 4th parameter is the flag summary used in a usage.
+         // The 5th parameter is the flag type (optional). When flag_type::exclusive is given,
+         // specifying the flag makes a parser ignore subcommands and arguments.
          //  It is useful for --help and --version flag.
 
         // Add a flag with a value.
@@ -122,20 +128,24 @@ using namespace nonsugar; // if you like
          // The parameter is the value placeholder used in a usage.
         ;
 ```
+
 3\. Parse the command line and get the option map.
+
 ```cpp
 try {
     // Parse the command line and get the option map.
     auto const opts = parse(argc, argv, cmd);
 } catch (error const &e) {
- // When the parsing failed, an object of basic_error<String> is thrown (error is a typedef of
+ // When the parser failed, an object of basic_error<String> is thrown (error is a typedef of
  // basic_error<std::string>).
 
     // Get the error message.
     std::cerr << e.message() << "\n";
 }
 ```
+
 4\. Read the option map.
+
 ```cpp
 // Is the option specified?
 if (opts.has<'o'>()) {
@@ -150,6 +160,7 @@ if (opts.has<'o'>()) {
     std::cout << "optimization level: " << n << "\n";
 }
 ```
+
 ``` cpp
 // get_shared() may be a smarter way.
 // It returns std::make_shared<Value>(value) when the flag is specified, nullptr otherwise.
@@ -157,7 +168,9 @@ if (auto const n = opts.get_shared<'o'>()) {
     std::cout << "optimization level: " << *n << "\n";
 }
 ```
+
 5\. Show the help message if necessary.
+
 ```cpp
 if (opts.has<'h'>()) {
     // Show the help message.
@@ -170,10 +183,11 @@ if (opts.has<'h'>()) {
 
 ### Wide character support
 You can use character types other than `char`.
+
 ```cpp
 try {
     auto const cmd = wcommand<char>(L"compiler")
-        .flag<'h'>({L'h',L'?'}, {L"help"}, L"produce help message")
+        .flag<'h'>({L'h',L'?'}, {L"help"}, L"", L"produce help message")
         ;
     auto const opts = parse(argc, wargv, cmd);
     if (opts.has<'h'>()) std::wcout << usage(cmd);
@@ -184,6 +198,7 @@ try {
 
 ### Subcommand support
 `nonsugar` supports subcommands. Example:
+
 ```cpp
 // subcmd.cpp
 #include <iostream>
@@ -215,8 +230,8 @@ try {
         // Add a subcommand.
         .subcommand<'A'>("add", "add command", addCmd)
 
-        .flag<'h'>({'h'}, {"help"}, "produce help message", true)
-         // The 4th parameter indicates that the subcommands are ignored when this flag is
+        .flag<'h'>({'h'}, {"help"}, "", "produce help message", flag_type::exclusive)
+         // flag_type::exclusive indicates that the subcommands are ignored when this flag is
          // specified.
         ;
 
@@ -243,7 +258,8 @@ try {
     std::cerr << e.message() << "\n";
 }
 ```
-``` shell
+
+```
 $ g++ -I.. subcmd.cpp -o subcmd
 
 $ ./subcmd
@@ -266,32 +282,8 @@ $ ./subcmd add 3 4
 7
 ```
 
-### Custom value reader
-By default, the flag value is translated by `std::basic_stringstream`. You can customize this behavior by giving a custom value reader to `flag()`.  A custom value reader shall have a signature `std::shared_ptr<Value> (String const &)`. It shall return `nullptr` when an invalid value is passed.
-```cpp
-auto const cmd = command<char>("custom")
-    .flag<'t', int>({'t'}, {"transparency"}, "N", "Set the transparency (0-255)",
-        [](std::string const &s) -> std::shared_ptr<int>
-        {
-            try {
-                int const n = boost::lexical_cast<int>(s);
-                return 0 <= n && n <= 255 ? std::make_shared<int>(n) : nullptr;
-            } catch (boost::bad_lexical_cast const &) {
-                return nullptr;
-            }
-        })
-    ;
-```
-If you'd just like to validate the value, you can use `predicate()` helper function.
-```cpp
-auto const cmd = command<char>("custom")
-    .flag<'t', int>({'t'}, {"transparency"}, "N", "Set the transparency (0-255)",
-        predicate<int>([](int n) { return 0 <= n && n <= 255; }))
-    ;
-```
-
 ## Author
-[@iorate](https://twitter.com/iorate)
+[iorate](https://github.com/iorate) ([Twitter](https://twitter.com/iorate))
 
 ## License
-[Boost Software License 1.0](http://www.boost.org/LICENSE_1_0.txt)
+[Boost Software License 1.0](LICENSE_1_0.txt)

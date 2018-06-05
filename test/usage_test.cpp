@@ -1,7 +1,7 @@
 
 // nonsugar
 //
-// Copyright iorate 2016-2017.
+// Copyright iorate 2016-2018.
 // Distributed under the Boost Software License, Version 1.0.
 // (See accompanying file LICENSE_1_0.txt or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
@@ -20,14 +20,15 @@
 BOOST_AUTO_TEST_CASE(usage_argument)
 {
     using namespace nonsugar;
-    enum class Option { A, B, C, D, E, F };
+    enum class Option { A, B, C, D, E, F, G };
     auto const cmd = command<Option>("usage", "usage test\nyes usage test")
-        .flag<Option::A>({'a'}, {"absorb"}, "HOGE")
+        .flag<Option::A>({'a'}, {"absorb"}, "HOGE") // deprecated style
         .flag<Option::B, int>({'b','B'}, {"burn"}, "N", "Once upon a time,\nthere is...")
         .flag<Option::C, boost::optional<int>>({'c'}, {"color","colour"}, "COLOR", "Set color")
         .argument<Option::D, std::string>("NAME")
         .argument<Option::E, boost::optional<int>>("NUMBER")
         .argument<Option::F, std::vector<std::string>>("PATHS")
+        .flag<Option::G>({'g'}, {}, "UNUSED", "G")
         ;
     BOOST_TEST(usage(cmd) ==
 R"(Usage: usage [OPTION...] NAME [NUMBER] [PATHS...]
@@ -39,6 +40,7 @@ Options:
   -b N, -B N  --burn=N                           Once upon a time,
                                                  there is...
   -c[COLOR]   --color[=COLOR], --colour[=COLOR]  Set color
+  -g                                             G
 )");
 }
 

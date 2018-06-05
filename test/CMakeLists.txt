@@ -1,7 +1,7 @@
 
 # nonsugar
 #
-# Copyright iorate 2017.
+# Copyright iorate 2017-2018.
 # Distributed under the Boost Software License, Version 1.0.
 # (See accompanying file LICENSE_1_0.txt or copy at
 # http://www.boost.org/LICENSE_1_0.txt)
@@ -10,6 +10,12 @@ find_package(Boost COMPONENTS unit_test_framework)
 if(NOT Boost_FOUND)
   message("Boost.Test is required to build tests.")
   return()
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES GNU|Clang)
+  add_compile_options(-Wno-deprecated-declarations)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+  add_compile_options(/wd4996)
 endif()
 
 set(test_names argument_test flag_default_read_test flag_help_or_version_test flag_long_test flag_short_test mock_test mock_wstring_test predicate_test subcommand_test usage_test)
