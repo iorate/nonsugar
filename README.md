@@ -282,6 +282,54 @@ $ ./subcmd add 3 4
 7
 ```
 
+### Flexible Argument Order
+By default, all strings after the first argument are treated as arguments, never as flags. You can allow the user to freely intersperse flags and arguments, by passing `argument_order::flexible` to `parse` function.
+
+```cpp
+// flexible.cpp
+#include <iostream>
+#include <string>
+#include <nonsugar.hpp>
+using namespace nonsugar;
+
+int main(int argc, char *argv[])
+try {
+    auto const cmd = command<char>("flexible")
+        .flag<'h'>({'h'}, {"help"}, "", "display this help and exit", flag_type::exclusive)
+        .flag<'o', std::string>({'o'}, {"output"}, "FILE", "write output to FILE")
+        .argument<'i', std::string>("INPUT-FILE")
+        ;
+    auto const opts = parse(argc, argv, cmd, argument_order::flexible);
+
+    if (opts.has<'h'>()) {
+        std::cout << usage(cmd);
+        return 0;
+    }
+
+    std::cout << "Input: " << opts.get<'i'>() << std::endl;
+    if (opts.has<'o'>()) {
+        std::cout << "Output: " << opts.get<'o'>() << std::endl;
+    }
+} catch (error const &e) {
+    std::cerr << e.message() << std::endl;
+}
+```
+
+```
+$ g++ -I.. flexible.cpp -o flexible
+
+$ ./flexible --help
+Usage: flexible [OPTION...] INPUT-FILE
+
+Options:
+  -h       --help         display this help and exit
+  -o FILE  --output=FILE  write output to FILE
+
+$ ./flexible input.cpp -o output.exe
+Input: input.cpp
+Output: output.exe
+```
+
 ## Author
 [iorate](https://github.com/iorate) ([Twitter](https://twitter.com/iorate))
 

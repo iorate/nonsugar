@@ -429,8 +429,15 @@ struct to_option_map;
 
 } // namespace detail
 
+enum class argument_order
+{
+    strict,
+    flexible
+};
+
 template <class Iterator, class Command>
-inline typename detail::to_option_map<Command>::type parse(Iterator, Iterator, Command const &);
+inline typename detail::to_option_map<Command>::type
+parse(Iterator, Iterator, Command const &, argument_order = argument_order::strict);
 
 template <class OptionType, class ...Pairs>
 class option_map : private Pairs...
@@ -438,7 +445,7 @@ class option_map : private Pairs...
 private:
     template <class Iterator, class Command>
     friend typename detail::to_option_map<Command>::type
-    parse(Iterator, Iterator, Command const &);
+    parse(Iterator, Iterator, Command const &, argument_order);
 
     template <OptionType Option, class Value>
     static auto &priv_value_impl(detail::option_pair<OptionType, Option, Value> &p)
@@ -789,7 +796,7 @@ inline bool contains(Container const &c, typename Container::value_type v)
 
 template <class Iterator, class Command>
 inline typename detail::to_option_map<Command>::type parse(
-    Iterator begin, Iterator end, Command const &command)
+    Iterator begin, Iterator end, Command const &command, argument_order order)
 {
     using string_type = typename Command::string_type;
     using error_type = basic_error<string_type>;
@@ -808,9 +815,14 @@ inline typename detail::to_option_map<Command>::type parse(
     auto const arg_last = args.end();
     bool exclusive = false;
 
+    constexpr auto subcommand_required =
+        std::tuple_size<typename Command::subcommand_tuple_type>::value != 0;
+    std::shared_ptr<string_type> subcommand_arg;
+    std::vector<string_type> argument_args;
+
     for (; arg_it != arg_last; ++arg_it) {
         if (*arg_it == _("--")) {
-            ++arg_it;
+            argument_args.insert(argument_args.end(), std::next(arg_it), arg_last);
             break;
         }
         std::match_results<typename string_type::const_iterator> match;
@@ -899,38 +911,51 @@ inline typename detail::to_option_map<Command>::type parse(
                         }
                     });
             }
+        } else if (subcommand_required && !subcommand_arg) {
+            // subcommand and arguments
+            subcommand_arg = detail::copy_shared(*arg_it);
+            argument_args.insert(argument_args.end(), std::next(arg_it), arg_last);
+            break;
+        } else if (order == argument_order::flexible) {
+            // argument
+            argument_args.push_back(*arg_it);
         } else {
-            // subcommand or argument
+            // arguments
+            argument_args.insert(argument_args.end(), arg_it, arg_last);
             break;
         }
     }
 
     if (exclusive) return opts;
 
-    if (std::tuple_size<typename Command::subcommand_tuple_type>::value != 0) {
-        if (arg_it == arg_last) throw error_type(command.m_header + _(": command required"));
+    auto argument_it = argument_args.begin();
+    auto const argument_last = argument_args.end();
+
+    if (subcommand_required) {
+        if (!subcommand_arg) {
+            throw error_type(command.m_header + _(": command required"));
+        }
         bool exact = false;
         detail::tuple_for_each(command.m_subcommands, [&](auto const &subcmd)
             {
-                if (subcmd.name == *arg_it) {
+                if (subcmd.name == *subcommand_arg) {
                     if (std::exchange(exact, true)) {
                         throw error_type(
-                            command.m_header + _(": ambiguous command: ") + *arg_it);
+                            command.m_header + _(": ambiguous command: ") + *subcommand_arg);
                     }
                 }
             });
         if (!exact) {
-            throw error_type(command.m_header + _(": unrecognized command: ") + *arg_it);
+            throw error_type(command.m_header + _(": unrecognized command: ") + *subcommand_arg);
         }
         detail::tuple_for_each(command.m_subcommands, [&](auto const &subcmd)
             {
-                if (subcmd.name == *arg_it) {
+                if (subcmd.name == *subcommand_arg) {
                     using subcommand_type = std::remove_cv_t<
                         std::remove_reference_t<decltype(subcmd)>>;
                     constexpr auto option = subcommand_type::option();
-                    ++arg_it;
                     opts.template priv_value<option>() = detail::copy_shared(
-                        parse(arg_it, arg_last, subcmd.command));
+                        parse(argument_it, argument_last, subcmd.command, order));
                 }
             });
         return opts;
@@ -943,23 +968,25 @@ inline typename detail::to_option_map<Command>::type parse(
             constexpr auto option = argument_type::option();
             string_type err;
             detail::parse_argument<string_type, value_type>()(
-                arg_it, arg_last, opts.template priv_value<option>(), arg, err);
+                argument_it, argument_last, opts.template priv_value<option>(), arg, err);
             if (!err.empty()) {
                 throw error_type(command.m_header + _(": ") + err);
             }
         });
 
-    if (arg_it != arg_last) {
-        throw error_type(command.m_header + _(": unrecognized argument: ") + *arg_it);
+    if (argument_it != argument_last) {
+        throw error_type(command.m_header + _(": unrecognized argument: ") + *argument_it);
     }
 
     return opts;
 }
 
 template <class Char, class Command>
-inline auto parse(int argc, Char * const *argv, Command const &command)
+inline auto parse(
+    int argc, Char * const *argv, Command const &command,
+    argument_order order = argument_order::strict)
 {
-    return parse(argv + (argc > 0 ? 1 : 0), argv + argc, command);
+    return parse(argv + (argc > 0 ? 1 : 0), argv + argc, command, order);
 }
 
 namespace detail {

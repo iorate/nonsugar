@@ -8,7 +8,7 @@
 
 add_custom_target(example)
 
-set(example_names compiler subcmd subcmd_od usage)
+set(example_names compiler flexible subcmd subcmd_od usage)
 if(WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES GNU OR CMAKE_CXX_COMPILER_ID MATCHES MSVC)
   list(APPEND example_names wide)
 endif()
