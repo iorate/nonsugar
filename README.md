@@ -181,7 +181,7 @@ if (opts.has<'h'>()) {
 
 ## Go Further
 
-### Wide character support
+### Wide Character Support
 You can use character types other than `char`.
 
 ```cpp
@@ -196,7 +196,7 @@ try {
 }
 ```
 
-### Subcommand support
+### Subcommand Support
 `nonsugar` supports subcommands. Example:
 
 ```cpp
@@ -329,6 +329,8 @@ $ ./flexible input.cpp -o output.exe
 Input: input.cpp
 Output: output.exe
 ```
+
+See also [the header synopsis](SYNOPSIS.hpp).
 
 ## Author
 [iorate](https://github.com/iorate) ([Twitter](https://twitter.com/iorate))
