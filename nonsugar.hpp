@@ -200,6 +200,8 @@ template <class String>
 class basic_error : public std::exception
 {
 public:
+    using string_type = String;
+
     explicit basic_error(String const &message) : m_message(message) {}
 
     char const *what() const noexcept override { return "nonsugar::basic_error"; }
@@ -282,6 +284,7 @@ class basic_command
 public:
     using char_type = typename String::value_type;
     using string_type = String;
+    using option_type = OptionType;
 
     using flag_tuple_type = Flags;
     using subcommand_tuple_type = Subcommands;
@@ -466,6 +469,8 @@ private:
     auto const &priv_value() const { return priv_value_impl<Option>(*this); }
     
 public:
+    using option_type = OptionType;
+
     template <OptionType Option>
     using type = typename std::remove_reference_t<
         decltype(priv_value_impl<Option>(std::declval<option_map &>()))>::element_type;
