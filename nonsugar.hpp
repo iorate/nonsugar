@@ -455,26 +455,26 @@ private:
     {
         return p.value;
     }
-    
+
     template <OptionType Option, class Value>
     static auto const &priv_value_impl(detail::option_pair<OptionType, Option, Value> const &p)
     {
         return p.value;
     }
-    
+
     template <OptionType Option>
     auto &priv_value() { return priv_value_impl<Option>(*this); }
 
     template <OptionType Option>
     auto const &priv_value() const { return priv_value_impl<Option>(*this); }
-    
+
 public:
     using option_type = OptionType;
 
     template <OptionType Option>
     using type = typename std::remove_reference_t<
         decltype(priv_value_impl<Option>(std::declval<option_map &>()))>::element_type;
-    
+
     template <OptionType Option>
     bool has() const { return static_cast<bool>(priv_value<Option>()); }
 
