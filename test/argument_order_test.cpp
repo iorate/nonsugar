@@ -7,7 +7,7 @@
 // http://www.boost.org/LICENSE_1_0.txt)
 
 #define BOOST_TEST_DYN_LINK
-#define BOOST_TEST_MODULE flag_default_read_test
+#define BOOST_TEST_MODULE argument_order_test
 
 #include <boost/test/unit_test.hpp>
 

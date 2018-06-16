@@ -18,9 +18,9 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
   add_compile_options(/wd4996)
 endif()
 
-set(test_names argument_test argument_order_test flag_default_read_test flag_help_or_version_test flag_long_test flag_short_test mock_test mock_wstring_test predicate_test subcommand_test usage_test)
+set(test_names argument_test argument_order_test flag_default_read_test flag_help_or_version_test flag_long_test flag_short_test mock_test mock_wstring_test parse_test predicate_test subcommand_test usage_test)
 if(CXX17)
-  list(APPEND test_names std_optional_test)
+  list(APPEND test_names parse_optional_test std_optional_test)
 endif()
 
 foreach(test_name IN LISTS test_names)

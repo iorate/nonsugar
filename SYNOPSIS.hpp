@@ -137,6 +137,48 @@ parse(
     argument_order order = argument_order::strict
     );
 
+// C++17 only
+template <class Iterator, class Command>
+std::optional<option_map<typename Command::option_type, unspecified...>>
+parse_optional(
+    Iterator begin,
+    Iterator end,
+    Command const &command,
+    typename Command::string_type &message
+    );
+
+// C++17 only
+template <class Iterator, class Command>
+std::optional<option_map<typename Command::option_type, unspecified...>>
+parse_optional(
+    Iterator begin,
+    Iterator end,
+    Command const &command,
+    argument_order order,
+    typename Command::string_type &message
+    );
+
+// C++17 only
+template <class Char, class Command>
+std::optional<option_map<typename Command::option_type, unspecified...>>
+parse_optional(
+    int argc,
+    Char * const *argv,
+    Command const &command,
+    typename Command::string_type &message
+    );
+
+// C++17 only
+template <class Char, class Command>
+std::optional<option_map<typename Command::option_type, unspecified...>>
+parse_optional(
+    int argc,
+    Char * const *argv,
+    Command const &command,
+    argument_order order,
+    typename Command::string_type &message
+    );
+
 /* Usage Generators */
 
 template <class Command>

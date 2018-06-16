@@ -17,10 +17,10 @@
 
 #ifdef _MSVC_LANG
 #if _MSVC_LANG >= 201703L
-#define NONSUGAR_USE_STD_OPTIONAL
+#define NONSUGAR_CXX17
 #endif
 #elif __cplusplus >= 201703L
-#define NONSUGAR_USE_STD_OPTIONAL
+#define NONSUGAR_CXX17
 #endif
 
 #include <algorithm>
@@ -37,7 +37,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-#ifdef NONSUGAR_USE_STD_OPTIONAL
+#ifdef NONSUGAR_CXX17
 #include <optional>
 #endif
 
@@ -74,7 +74,7 @@ struct optional_traits<boost::optional<T>>
     static boost::optional<T> construct(T const &v) { return v; }
 };
 
-#ifdef NONSUGAR_USE_STD_OPTIONAL
+#ifdef NONSUGAR_CXX17
 template <class T>
 struct optional_traits<std::optional<T>>
 {
@@ -484,7 +484,7 @@ public:
     template <OptionType Option>
     auto get_shared() const { return priv_value<Option>(); }
 
-#ifdef NONSUGAR_USE_STD_OPTIONAL
+#ifdef NONSUGAR_CXX17
     template <OptionType Option>
     auto get_optional() const
     {
@@ -993,6 +993,46 @@ inline auto parse(
 {
     return parse(argv + (argc > 0 ? 1 : 0), argv + argc, command, order);
 }
+
+#ifdef NONSUGAR_CXX17
+template <class Iterator, class Command>
+inline std::optional<typename detail::to_option_map<Command>::type> parse_optional(
+    Iterator begin, Iterator end, Command const &cmd, argument_order order,
+    typename Command::string_type &message)
+try {
+    return parse(begin, end, cmd, order);
+} catch (basic_error<typename Command::string_type> const &e) {
+    message = e.message();
+    return std::nullopt;
+}
+
+template <class Iterator, class Command>
+inline auto parse_optional(
+    Iterator begin, Iterator end, Command const &cmd,
+    typename Command::string_type &message)
+{
+    return parse_optional(begin, end, cmd, argument_order::strict, message);
+}
+
+template <class Char, class Command>
+inline std::optional<typename detail::to_option_map<Command>::type> parse_optional(
+    int argc, Char * const *argv, Command const &cmd, argument_order order,
+    typename Command::string_type &message)
+try {
+    return parse(argc, argv, cmd, order);
+} catch (basic_error<typename Command::string_type> const &e) {
+    message = e.message();
+    return std::nullopt;
+}
+
+template <class Char, class Command>
+inline auto parse_optional(
+    int argc, Char * const *argv, Command const &cmd,
+    typename Command::string_type &message)
+{
+    return parse_optional(argc, argv, cmd, argument_order::strict, message);
+}
+#endif
 
 namespace detail {
 
