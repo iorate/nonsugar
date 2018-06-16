@@ -482,7 +482,11 @@ public:
     auto get() const { return *priv_value<Option>(); }
 
     template <OptionType Option>
-    auto get_shared() const { return priv_value<Option>(); }
+    auto get_shared() const
+    {
+        auto const &v = priv_value<Option>();
+        return v ? detail::copy_shared(*v) : nullptr;
+    }
 
 #ifdef NONSUGAR_CXX17
     template <OptionType Option>
