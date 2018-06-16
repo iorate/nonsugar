@@ -22,7 +22,7 @@ try {
         .argument<'l', int>("LHS")
         .argument<'r', int>("RHS")
         ;
-    
+
     // Create the main command.
     auto const cmd = command<char>("subcmd")
         // Add a subcommand.
